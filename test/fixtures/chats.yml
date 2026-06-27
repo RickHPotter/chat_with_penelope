@@ -1,0 +1,20 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+# == Schema Information
+#
+# Table name: chats
+# Database name: primary
+#
+#  id              :bigint           not null, primary key
+#  target_language :string
+#  title           :string
+#  created_at      :datetime         not null
+#  updated_at      :datetime         not null
+#
+one:
+  title: MyString
+  target_language: MyString
+
+two:
+  title: MyString
+  target_language: MyString
