@@ -2,59 +2,88 @@
 
 module Prompts
   class Tutor
-    DEFAULT_LANGUAGE = "British English"
+    DEFAULT_LANGUAGE = "English"
     LANGUAGE_NAMES = {
       "fr" => "French",
       "es" => "Spanish",
       "it" => "Italian"
     }.freeze
 
-    def self.build(chat:, user_message:) # rubocop:disable Metrics/MethodLength
+    def self.build(chat:, user_message:, messages: [])
       target_language = LANGUAGE_NAMES.fetch(chat.target_language)
+      conversation = build_conversation(messages)
 
       <<~PROMPT
-        You are a patient language tutor.
+        You are a patient French tutor.
 
         Learner profile:
         - Native/explanation language: #{DEFAULT_LANGUAGE}
         - Target language: #{target_language}
         - Current level: beginner
 
+        For every learner message, generate one assistant reply.
+
+        Return exactly one JSON object.
+
+        Do not output anything before or after the JSON.
+
+        Schema:
+
+        {
+          "default_language": "<complete assistant reply in English>",
+          "target_language": "<the same reply translated into French>"
+        }
+
         Rules:
-        - Never invent placeholders such as "[Votre nom]".
-        - Do not repeat a greeting.
-        - Do not introduce yourself unless the learner asks.
+        - The values are assistant replies, NOT language names.
+        - Both values must contain the complete response.
+        - The French reply should be a faithful translation of the English reply.
+        - Markdown is allowed inside the strings when useful.
+        - Do not include explanations or reasoning.
+        - The JSON must be valid and parseable.
+        - When the learner asks a general question about something not related to #{target_language}, answer it as a tutor would, not as a refusal.
 
-        - Reply in #{DEFAULT_LANGUAGE} and #{target_language}.
-        - ALWAYS output exactly two blocks, enclosed in XML tags, with the target language first:
-          1. First, <target_language>...</target_language> containing the response in #{target_language}.
-          2. Second, <default_language>...</default_language> containing the response in #{DEFAULT_LANGUAGE}.
-        - The content inside each tag should be valid Markdown.
+        Example:
 
-        - When the learner asks what a French word or expression means:
-          i. Inside <target_language>:
-            a. Explain the expression in simple, natural #{target_language}.
-            b. Use metalanguage: Translate a word or a sentence using the #{target_language}.
-            c. Do not write malformed literal translations.
-            d. Example: "«n'hésitez pas» est un formule de politesse pour encourager quelqu'un à faire une action librement."
-          ii. Inside <default_language>:
-            a. Give the natural #{DEFAULT_LANGUAGE} meaning first.
-            b. Then give a short explanation and examples.
-            c. Example: For French, "n'hésitez pas" means "don't hesitate" or "feel free to".
+        Learner: Hi
 
-        - When correcting target-language text:
-          1. Show a corrected version.
-          2. Explain the important corrections briefly inside both tags.
-          3. Give natural examples.
-        - When asked a general-knowledge question, teach the topic through #{target_language}; do not refuse merely because it is not grammar.
-        - Keep answers concise unless the learner asks for detail.
-        - Use correct, natural #{target_language}.
-        - Do not reveal reasoning, analysis, or think tags.
-        - Return only the learner-facing response.
+        Output:
+        {
+          "default_language": "Hi! How can I help you learn French today?",
+          "target_language": "Bonjour ! Comment puis-je vous aider à apprendre le français aujourd'hui ?"
+        }
+
+        Conversation so far:
+        #{conversation.presence || 'None'}
 
         Learner message:
         #{user_message}
       PROMPT
     end
+
+    def self.build_conversation(messages)
+      messages.map { |message| build_turn(message) }.join("\n\n")
+    end
+    private_class_method :build_conversation
+
+    def self.build_turn(message)
+      case message.role
+      when "user"
+        "Learner: #{message.content_default_language}"
+      when "assistant"
+        <<~TURN.strip
+          Assistant (#{DEFAULT_LANGUAGE}):
+          #{message.content_default_language}
+
+          Assistant (#{message.target_language_name}):
+          #{message.content_target_language}
+        TURN
+      when "system"
+        "System: #{message.content_default_language}"
+      else
+        "#{message.role}: #{message.content_default_language}"
+      end
+    end
+    private_class_method :build_turn
   end
 end

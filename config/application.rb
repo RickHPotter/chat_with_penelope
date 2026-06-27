@@ -17,8 +17,8 @@ module ChatWithPenelope
     config.autoload_lib(ignore: %w[assets tasks])
 
     config.chat = {
-      "chat_api_url" => ENV.fetch("OLLAMA_API_URL", "http://127.0.0.1:11434/api/generate"),
-      "chat_model" => ENV.fetch("OLLAMA_MODEL", "llama3.2")
+      "chat_api_url" => ENV.fetch("CHAT_API_URL", "http://127.0.0.1:11434/api/generate"),
+      "chat_model" => ENV.fetch("CHAT_MODEL", "qwen3:8b")
     }
 
     config.active_job.queue_adapter = :solid_queue

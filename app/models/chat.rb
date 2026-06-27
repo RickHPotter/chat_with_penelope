@@ -15,4 +15,8 @@ class Chat < ApplicationRecord
   has_many :messages, dependent: :destroy
 
   validates :title, :target_language, presence: true
+
+  def self.default_chat
+    first_or_create!(title: "French Tutor", target_language: "fr")
+  end
 end
