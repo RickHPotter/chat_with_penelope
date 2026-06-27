@@ -1,0 +1,15 @@
+<% if message.assistant? %>
+  <%= render "chat/assistant_message", message: message %>
+<% elsif message.system? %>
+  <div id="<%= dom_id(message) %>" class="flex justify-center">
+    <div class="max-w-2xl rounded-3xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+      <%= message.content_default_language %>
+    </div>
+  </div>
+<% else %>
+  <div id="<%= dom_id(message) %>" class="flex justify-end">
+    <div class="max-w-2xl rounded-3xl rounded-br-md bg-sky-400 px-4 py-3 text-sm leading-6 text-slate-950">
+      <%= message.content_default_language %>
+    </div>
+  </div>
+<% end %>
