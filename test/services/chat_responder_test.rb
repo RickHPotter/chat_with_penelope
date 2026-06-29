@@ -65,9 +65,26 @@ class ChatResponderTest < ActiveSupport::TestCase
     assert_equal "Mis à jour.", assistant.reload.content_target_language
   end
 
+  test "submit_message accepts an empty default language response" do
+    chat = Chat.create!(title: "French Tutor", target_language: "fr")
+    response = JSON.generate(
+      response: JSON.generate(
+        default_language: "",
+        target_language: "Je suis fatigué."
+      )
+    )
+    client = FakeClient.new(->(_prompt) { response })
+
+    result = ChatResponder.new(chat:, client:).submit_message(content: "I am tired.")
+
+    assert result.success?
+    assert_equal "", result.response_message.content_default_language
+    assert_equal "Je suis fatigué.", result.response_message.content_target_language
+  end
+
   test "submit_message returns a system message when the provider is unavailable" do
     chat = Chat.create!(title: "French Tutor", target_language: "fr")
-    client = FakeClient.new(->(_prompt) { raise LLM::ConnectionError, "down" })
+    client = FakeClient.new(->(_prompt) { raise LLM::Errors::ConnectionError, "down" })
 
     result = ChatResponder.new(chat:, client:).submit_message(content: "Hello")
 

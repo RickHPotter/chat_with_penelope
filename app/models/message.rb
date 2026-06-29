@@ -8,6 +8,7 @@
 #  id                       :bigint           not null, primary key
 #  content_default_language :text
 #  content_target_language  :text
+#  prompt_metadata          :jsonb            not null
 #  raw_response             :text
 #  role                     :string
 #  created_at               :datetime         not null
@@ -26,7 +27,8 @@ class Message < ApplicationRecord
   belongs_to :chat
 
   validates :role, presence: true, inclusion: { in: %w[user assistant system] }
-  validates :content_default_language, :content_target_language, presence: true
+  validates :content_default_language, presence: true, unless: :assistant?
+  validates :content_target_language, presence: true
   validates :raw_response, presence: true, if: :assistant?
 
   scope :chronological, -> { order(:created_at, :id) }

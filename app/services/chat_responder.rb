@@ -24,7 +24,8 @@ class ChatResponder
     user_message = chat.messages.create!(
       role: "user",
       content_default_language: text,
-      content_target_language: text
+      content_target_language: text,
+      prompt_metadata: prompt_metadata_for(text)
     )
 
     response_message = generate_response_message(messages: conversation_for(user_message), user_message: text)
@@ -53,17 +54,19 @@ class ChatResponder
   attr_reader :chat, :client
 
   def generate_response_message(messages:, user_message:)
+    prompt_metadata = prompt_metadata_for(user_message)
     raw_response = client.generate(
       prompt: Prompts::Tutor.build(chat:, user_message:, messages:)
     )
 
     parsed = parse_structured_response(raw_response)
-    build_assistant_message(parsed, raw_response:)
+    build_assistant_message(parsed, raw_response:, prompt_metadata:)
   rescue LLM::Errors::MalformedResponseError
-    build_assistant_fallback_message(raw_response:)
+    build_assistant_fallback_message(raw_response:, prompt_metadata:)
   end
 
   def regenerate_assistant_message(assistant_message, messages:, user_message:)
+    prompt_metadata = prompt_metadata_for(user_message)
     raw_response = client.generate(
       prompt: Prompts::Tutor.build(chat:, user_message:, messages:)
     )
@@ -72,14 +75,16 @@ class ChatResponder
     assistant_message.update!(
       content_default_language: parsed.fetch(:default_language),
       content_target_language: parsed.fetch(:target_language),
-      raw_response:
+      raw_response:,
+      prompt_metadata:
     )
     assistant_message
   rescue LLM::Errors::MalformedResponseError
     assistant_message.update!(
       content_default_language: FALLBACK_DEFAULT_MESSAGE,
       content_target_language: FALLBACK_TARGET_MESSAGE,
-      raw_response:
+      raw_response:,
+      prompt_metadata:
     )
     assistant_message
   end
@@ -92,7 +97,7 @@ class ChatResponder
     default_language = inner_payload.fetch("default_language").to_s.strip
     target_language = inner_payload.fetch("target_language").to_s.strip
 
-    raise LLM::Errors::MalformedResponseError, "Structured response is missing required content" if default_language.blank? || target_language.blank?
+    raise LLM::Errors::MalformedResponseError, "Structured response is missing required target_language" if target_language.blank?
 
     {
       default_language:,
@@ -102,21 +107,23 @@ class ChatResponder
     raise LLM::Errors::MalformedResponseError, e.message
   end
 
-  def build_assistant_message(parsed_response, raw_response:)
+  def build_assistant_message(parsed_response, raw_response:, prompt_metadata:)
     chat.messages.create!(
       role: "assistant",
       content_default_language: parsed_response.fetch(:default_language),
       content_target_language: parsed_response.fetch(:target_language),
-      raw_response:
+      raw_response:,
+      prompt_metadata:
     )
   end
 
-  def build_assistant_fallback_message(raw_response:)
+  def build_assistant_fallback_message(raw_response:, prompt_metadata:)
     chat.messages.create!(
       role: "assistant",
       content_default_language: FALLBACK_DEFAULT_MESSAGE,
       content_target_language: FALLBACK_TARGET_MESSAGE,
-      raw_response:
+      raw_response:,
+      prompt_metadata:
     )
   end
 
@@ -149,5 +156,26 @@ class ChatResponder
     else
       "Something went wrong while generating a reply."
     end
+  end
+
+  def prompt_metadata_for(text)
+    classification = MessageClassifier.classify(text)
+
+    {
+      classifier: classification.to_h,
+      prompt_builder: prompt_builder_name_for(classification.intent),
+      llm_model: Rails.configuration.chat.fetch("chat_model")
+    }
+  end
+
+  def prompt_builder_name_for(intent)
+    {
+      french_sentence: "Prompts::FrenchSentence",
+      english_sentence: "Prompts::EnglishSentence",
+      vocabulary: "Prompts::Vocabulary",
+      grammar: "Prompts::Grammar",
+      translation: "Prompts::Translation",
+      conversation: "Prompts::Tutor legacy fallback"
+    }.fetch(intent)
   end
 end

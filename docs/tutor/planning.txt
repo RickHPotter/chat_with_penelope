@@ -1,0 +1,488 @@
+# Tutor Prompt Refactor Plan
+
+## Goal
+
+Replace the current monolithic `Prompts::Tutor` prompt with deterministic,
+intent-specific prompt builders for a beginner French tutor backed by Ollama
+Qwen3:8B.
+
+The new architecture should:
+
+- Keep the current JSON response contract:
+  - `default_language`
+  - `target_language`
+- Keep `ChatResponder` public behavior compatible where possible.
+- Move intent decisions into Ruby code instead of asking the model to infer them.
+- Share common prompt text through a base prompt builder.
+- Use clear, labeled input sections so the model receives structured data.
+
+## Target Files
+
+Create:
+
+- `app/services/message_classifier.rb`
+- `app/services/prompts/base.rb`
+- `app/services/prompts/french_sentence.rb`
+- `app/services/prompts/english_sentence.rb`
+- `app/services/prompts/vocabulary.rb`
+- `app/services/prompts/grammar.rb`
+- `app/services/prompts/translation.rb`
+
+Update:
+
+- `app/services/prompts/tutor.rb`
+- `app/services/prompts.rb`
+- `app/services/chat_responder.rb`, only if needed to preserve the existing call
+  path cleanly.
+
+Add tests under `test/`, since this app currently uses Rails minitest rather
+than RSpec.
+
+## Architecture
+
+### 1. Keep `Prompts::Tutor` as the dispatcher
+
+Preserve the existing public API:
+
+```ruby
+Prompts::Tutor.build(chat:, user_message:, messages: [])
+```
+
+Inside `Prompts::Tutor.build`:
+
+1. Classify `user_message` with `MessageClassifier`.
+2. Select the matching prompt builder.
+3. Pass `chat`, `user_message`, and `messages` into the selected builder.
+4. Return the generated prompt string.
+
+This keeps `ChatResponder` stable and limits integration risk.
+
+### 2. Add `MessageClassifier`
+
+The classifier must be deterministic and must not use an LLM.
+
+Supported intents:
+
+- `:french_sentence`
+- `:english_sentence`
+- `:vocabulary`
+- `:grammar`
+- `:translation`
+- `:conversation`
+
+Suggested API:
+
+```ruby
+MessageClassifier.call(text)
+```
+
+or:
+
+```ruby
+MessageClassifier.new(text).intent
+```
+
+Prefer the smaller API unless tests reveal a need for more state.
+
+### 3. Add `Prompts::Base`
+
+`Prompts::Base` should centralize:
+
+- Language constants.
+- Target language name lookup.
+- Conversation formatting.
+- Shared JSON/schema instructions.
+- Shared learner profile.
+- Shared output rules.
+
+The base prompt should include:
+
+```text
+You are a patient French tutor.
+
+## Learner profile
+
+* Native language: English
+* Target language: French
+* Current level: Beginner
+
+## Instructions
+
+* Answer only the latest learner request.
+* Use the conversation history only as context.
+* Do not repeat previous answers.
+* Do not reveal reasoning or internal analysis.
+* Prefer standard French used in France.
+* Mention regional variants only when they are directly relevant.
+
+## Output format
+
+Return exactly one JSON object.
+
+Do not output any text before or after the JSON.
+
+The JSON must be valid and parseable.
+
+Schema
+
+{
+  "default_language": string,
+  "target_language": string
+}
+
+Markdown may be used inside the JSON strings.
+```
+
+Use this as the canonical base wording because it is more deterministic than
+the first draft while preserving the same requirements.
+
+### 4. Standardize input sections
+
+Do not end prompts with ambiguous prose like:
+
+```text
+Learner message:
+...
+```
+
+Use labeled input sections based on intent:
+
+- `Sentence:` for French and English sentence prompts.
+- `Expression:` for vocabulary prompts when extraction is available.
+- `Question:` for grammar prompts.
+- `Input:` for translation prompts, plus `Direction:` if Ruby determines it.
+
+Include conversation history before the labeled input:
+
+```text
+Conversation history:
+
+...
+
+Sentence:
+
+Je me couche à dix heures.
+```
+
+## Message Classifier Rules
+
+Normalize the message before classification:
+
+- Strip whitespace.
+- Downcase.
+- Collapse repeated whitespace.
+
+Suggested priority order:
+
+1. Translation
+2. Vocabulary
+3. Grammar
+4. French sentence
+5. English sentence
+6. Conversation
+
+Priority matters because short questions like "What does comprendre mean?"
+could otherwise be treated as English sentences.
+
+### Translation
+
+Return `:translation` when the normalized text:
+
+- starts with `translate`
+- starts with `how do you say`
+- starts with `how to say`
+
+### Vocabulary
+
+Return `:vocabulary` when the normalized text:
+
+- starts with `define`
+- starts with `what does`
+- starts with `what is`
+- contains `mean`
+- contains `signifie`
+- contains `veut dire`
+
+### Grammar
+
+Return `:grammar` when the normalized text:
+
+- starts with `why`
+- starts with `how`
+- contains `grammar`
+- contains `grammatically`
+- contains `conjugate`
+- contains `conjugation`
+- contains `difference`
+- contains `pourquoi`
+- contains `pourquoi est-ce que`
+
+### French sentence
+
+Return `:french_sentence` when:
+
+- The message appears mostly French.
+- The message does not look like a question.
+
+Use simple heuristics, not language detection libraries.
+
+Possible signals:
+
+- French accented characters.
+- Common French function words, such as `je`, `tu`, `il`, `elle`, `nous`,
+  `vous`, `ils`, `elles`, `le`, `la`, `les`, `un`, `une`, `des`, `de`, `du`,
+  `au`, `aux`, `est`, `suis`, `sont`, `avec`, `pour`, `dans`, `pas`.
+- Common contractions, such as `j'`, `l'`, `d'`, `qu'`, `c'`.
+
+Treat text as a question if it:
+
+- ends with `?`
+- starts with common English question words, such as `what`, `why`, `how`,
+  `when`, `where`, `who`
+- starts with common French question words, such as `pourquoi`, `comment`,
+  `quand`, `où`, `qui`, `que`, `quoi`
+
+### English sentence
+
+Return `:english_sentence` when:
+
+- The message appears mostly English.
+- The message does not look like a question.
+
+Good enough initial rule:
+
+- Contains alphabetic words.
+- Does not match any higher-priority intent.
+- Does not look like French by the French heuristic.
+- Does not look like a question.
+
+### Conversation
+
+Return `:conversation` for everything else.
+
+Do not implement a separate conversation prompt in this iteration. The
+classifier should still return `:conversation`, and the dispatcher should have
+a deliberate fallback behavior.
+
+## Prompt Builders
+
+All prompt builders should:
+
+- Include the base prompt.
+- Include conversation history using the existing formatting.
+- Include only instructions for the already-classified intent.
+- Avoid wording like "determine whether..." or "if the learner wants...".
+- Keep explanations beginner-friendly.
+
+### `Prompts::FrenchSentence`
+
+Use when the learner submitted a French sentence.
+
+`default_language`:
+
+- Return only a natural English translation.
+
+`target_language`:
+
+- Include `# Grammar Validation`.
+- State whether the sentence is grammatically correct.
+- If incorrect:
+  - State that it is incorrect.
+  - Provide the corrected sentence.
+  - Explain each correction individually.
+- If correct:
+  - State that it is correct.
+  - Briefly explain why.
+- Include `# Grammar Breakdown`.
+- Break down every important word.
+- Include `# Notes` only when useful.
+- Include `# Synonyms` only when useful.
+
+### `Prompts::EnglishSentence`
+
+Use when the learner submitted an English sentence.
+
+`default_language`:
+
+- Return an empty string.
+
+`target_language`:
+
+- Include `# Translation`.
+- Provide a natural French translation.
+- Include `# Grammar Breakdown`.
+- Explain the grammatical role of each important translated French word.
+- Include `# Notes` for important grammar choices.
+- Include `# Alternative Translations` only when common natural alternatives
+  exist.
+
+### `Prompts::Vocabulary`
+
+Use when the learner asked a vocabulary question.
+
+`default_language`:
+
+- Explain in English.
+
+`target_language`:
+
+- Explain the same content in French.
+
+Both values should use:
+
+- `# Word or Expression`
+- `# Part of Speech`
+- `# Meaning`
+- `# Usage`
+- `# Examples`
+- `# Related Words`, optional
+
+Include grammar details where applicable:
+
+- noun gender
+- verb infinitive
+- adjective agreement
+- register, such as formal, informal, or literary
+
+Provide three natural example sentences.
+
+### `Prompts::Grammar`
+
+Use when the learner asked a grammar question.
+
+`default_language`:
+
+- Explain in English.
+
+`target_language`:
+
+- Explain the same content in French.
+
+Both values should use:
+
+- `# Rule`
+- `# Explanation`
+- `# Examples`
+- `# Common Mistakes`
+- `# Exceptions`, only when genuine exceptions exist
+
+Rules:
+
+- Answer directly.
+- Never invent grammar rules.
+- Prefer standard French used in France.
+- If multiple correct forms exist, explain which one is most common in France.
+
+### `Prompts::Translation`
+
+Use when the learner explicitly requested a translation.
+
+Ruby should determine translation direction before building the prompt, using a
+simple heuristic:
+
+- Mostly French input means French to English.
+- Otherwise English to French.
+
+If translating French to English:
+
+`default_language`:
+
+- Provide the English translation.
+
+`target_language`:
+
+- Explain the French sentence.
+- Include a grammar breakdown.
+
+If translating English to French:
+
+`default_language`:
+
+- Return an empty string.
+
+`target_language`:
+
+- Include `# Translation`.
+- Include `# Grammar Breakdown`.
+- Include `# Notes`.
+- Include `# Alternative Translations`, optional.
+
+Prefer natural translation over literal translation. Include literal
+translation only when it helps the learner.
+
+## Conversation Intent
+
+Do not implement a dedicated conversation prompt yet.
+
+For this iteration, choose one of these fallback approaches:
+
+1. Route `:conversation` to the existing broad `Prompts::Tutor` behavior kept
+   as a legacy fallback.
+2. Route `:conversation` to a minimal generic tutor prompt that uses the new
+   base prompt.
+
+Recommended approach: keep a small legacy-compatible fallback inside
+`Prompts::Tutor` for now, then remove it when a dedicated conversation prompt is
+defined. This preserves current behavior for greetings and broad questions.
+
+## Implementation Steps
+
+1. Add `MessageClassifier` with tests for each intent.
+2. Extract shared language constants and conversation formatting into
+   `Prompts::Base`.
+3. Add each intent-specific prompt builder.
+4. Refactor `Prompts::Tutor.build` into a dispatcher.
+5. Keep `Prompts::Tutor::LANGUAGE_NAMES` available or provide a compatibility
+   alias, because `Message#target_language_name` currently references it.
+6. Update requires/autoload assumptions if needed through `app/services/prompts.rb`.
+7. Add prompt builder tests that assert key sections and JSON instructions are
+   present.
+8. Add dispatcher tests that verify representative messages route to the
+   expected builder behavior.
+9. Run the Rails test suite.
+
+## Test Plan
+
+Add tests for `MessageClassifier`:
+
+- `Define fatiguée.` -> `:vocabulary`
+- `What does comprendre mean?` -> `:vocabulary`
+- `Que veut dire pourtant ?` -> `:vocabulary`
+- `Why is it "je me couche"?` -> `:grammar`
+- `Difference between que and quoi?` -> `:grammar`
+- `Translate je suis fatigué` -> `:translation`
+- `How do you say I am tired?` -> `:translation`
+- `Je suis fatigué.` -> `:french_sentence`
+- `J'habite rue Dumas.` -> `:french_sentence`
+- `I am tired.` -> `:english_sentence`
+- `I want a clean room.` -> `:english_sentence`
+- `Hi` -> `:conversation`
+
+Add tests for prompt builders:
+
+- Every builder includes the base JSON output contract.
+- Every builder includes conversation history.
+- French sentence prompt asks for English translation in `default_language`.
+- English sentence prompt asks for empty `default_language`.
+- Vocabulary and grammar prompts ask for bilingual explanations.
+- Translation prompt includes direction-specific instructions.
+
+Add integration-level tests through `ChatResponder` or `Prompts::Tutor`:
+
+- Existing `ChatResponder` tests should continue passing.
+- A French sentence prompt should include `Sentence:` and French sentence task
+  sections.
+- A vocabulary question should include vocabulary task sections.
+
+## Open Decisions
+
+No blocking inconsistency was found between the two prompt documents.
+
+The only implementation choice to confirm before coding is the
+`:conversation` fallback:
+
+- Keep legacy broad tutor behavior for conversation until a dedicated prompt is
+  designed.
+- Or add a minimal new generic conversation prompt using `Prompts::Base`.
+
+The safer default is to keep legacy broad behavior temporarily.

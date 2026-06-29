@@ -10,6 +10,38 @@
   <div id="<%= dom_id(message) %>" class="flex justify-end">
     <div class="max-w-2xl rounded-3xl rounded-br-md bg-sky-400 px-4 py-3 text-sm leading-6 text-slate-950">
       <%= message.content_default_language %>
+
+      <% if message.prompt_metadata.present? %>
+        <details class="mt-3 rounded-2xl border border-slate-950/10 bg-sky-300/40 px-3 py-2 text-xs leading-5 text-slate-900">
+          <summary class="cursor-pointer font-semibold">Prompt debug</summary>
+          <dl class="mt-2 grid gap-1">
+            <div>
+              <dt class="font-semibold">Intent</dt>
+              <dd><%= message.prompt_metadata.dig("classifier", "intent") %></dd>
+            </div>
+            <div>
+              <dt class="font-semibold">Matched rule</dt>
+              <dd><%= message.prompt_metadata.dig("classifier", "matched_rule") %></dd>
+            </div>
+            <div>
+              <dt class="font-semibold">Prompt builder</dt>
+              <dd><%= message.prompt_metadata["prompt_builder"] %></dd>
+            </div>
+            <div>
+              <dt class="font-semibold">Input excerpt</dt>
+              <dd class="whitespace-pre-wrap"><%= message.prompt_metadata.dig("classifier", "input_excerpt") %></dd>
+            </div>
+            <div>
+              <dt class="font-semibold">Signals</dt>
+              <dd>
+                mostly_french=<%= message.prompt_metadata.dig("classifier", "mostly_french") %>,
+                question=<%= message.prompt_metadata.dig("classifier", "question") %>,
+                model=<%= message.prompt_metadata["llm_model"] %>
+              </dd>
+            </div>
+          </dl>
+        </details>
+      <% end %>
     </div>
   </div>
 <% end %>

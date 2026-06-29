@@ -46,4 +46,39 @@
       <%= message.content_default_language %>
     </div>
   </div>
+
+  <% if message.prompt_metadata.present? %>
+    <details class="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs leading-5 text-amber-50">
+      <summary class="cursor-pointer font-semibold">Prompt debug</summary>
+      <dl class="mt-3 grid gap-2 sm:grid-cols-2">
+        <div>
+          <dt class="font-semibold text-amber-100">Intent</dt>
+          <dd><%= message.prompt_metadata.dig("classifier", "intent") %></dd>
+        </div>
+        <div>
+          <dt class="font-semibold text-amber-100">Matched rule</dt>
+          <dd><%= message.prompt_metadata.dig("classifier", "matched_rule") %></dd>
+        </div>
+        <div>
+          <dt class="font-semibold text-amber-100">Prompt builder</dt>
+          <dd><%= message.prompt_metadata["prompt_builder"] %></dd>
+        </div>
+        <div>
+          <dt class="font-semibold text-amber-100">Model</dt>
+          <dd><%= message.prompt_metadata["llm_model"] %></dd>
+        </div>
+        <div class="sm:col-span-2">
+          <dt class="font-semibold text-amber-100">Input excerpt</dt>
+          <dd class="whitespace-pre-wrap"><%= message.prompt_metadata.dig("classifier", "input_excerpt") %></dd>
+        </div>
+        <div class="sm:col-span-2">
+          <dt class="font-semibold text-amber-100">Classifier signals</dt>
+          <dd>
+            mostly_french=<%= message.prompt_metadata.dig("classifier", "mostly_french") %>,
+            question=<%= message.prompt_metadata.dig("classifier", "question") %>
+          </dd>
+        </div>
+      </dl>
+    </details>
+  <% end %>
 </div>

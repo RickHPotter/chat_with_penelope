@@ -2,16 +2,32 @@
 
 module Prompts
   class Tutor
-    DEFAULT_LANGUAGE = "English"
-    LANGUAGE_NAMES = {
-      "fr" => "French",
-      "es" => "Spanish",
-      "it" => "Italian"
-    }.freeze
+    DEFAULT_LANGUAGE = Base::DEFAULT_LANGUAGE
+    LANGUAGE_NAMES = Base::LANGUAGE_NAMES
 
     def self.build(chat:, user_message:, messages: [])
-      target_language = LANGUAGE_NAMES.fetch(chat.target_language)
-      conversation = build_conversation(messages)
+      classification = MessageClassifier.classify(user_message)
+      intent = classification.intent
+
+      return legacy_build(chat:, user_message:, messages:) if intent == :conversation
+
+      builder_for(intent).build(chat:, user_message: classification.input_excerpt, messages:)
+    end
+
+    def self.builder_for(intent)
+      {
+        french_sentence: Prompts::FrenchSentence,
+        english_sentence: Prompts::EnglishSentence,
+        vocabulary: Prompts::Vocabulary,
+        grammar: Prompts::Grammar,
+        translation: Prompts::Translation
+      }.fetch(intent)
+    end
+    private_class_method :builder_for
+
+    def self.legacy_build(chat:, user_message:, messages: [])
+      target_language = LANGUAGE_NAMES.fetch(chat.target_language, chat.target_language)
+      conversation = Prompts::Base.build_conversation(messages)
 
       <<~PROMPT
         You are a patient French tutor.
@@ -60,30 +76,6 @@ module Prompts
         #{user_message}
       PROMPT
     end
-
-    def self.build_conversation(messages)
-      messages.map { |message| build_turn(message) }.join("\n\n")
-    end
-    private_class_method :build_conversation
-
-    def self.build_turn(message)
-      case message.role
-      when "user"
-        "Learner: #{message.content_default_language}"
-      when "assistant"
-        <<~TURN.strip
-          Assistant (#{DEFAULT_LANGUAGE}):
-          #{message.content_default_language}
-
-          Assistant (#{message.target_language_name}):
-          #{message.content_target_language}
-        TURN
-      when "system"
-        "System: #{message.content_default_language}"
-      else
-        "#{message.role}: #{message.content_default_language}"
-      end
-    end
-    private_class_method :build_turn
+    private_class_method :legacy_build
   end
 end
