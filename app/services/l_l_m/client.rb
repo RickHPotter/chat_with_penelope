@@ -13,10 +13,22 @@ module LLM
     private
 
     def default_provider
-      LLM::Providers::Ollama.new(
-        api_url: Rails.application.config.chat["chat_api_url"],
-        model: Rails.application.config.chat["chat_model"]
-      )
+      provider_class.new(api_url: chat_config.fetch("chat_api_url"), model: chat_config.fetch("chat_model"))
+    end
+
+    def provider_class
+      case chat_config.fetch("chat_provider")
+      when "ollama"
+        LLM::Providers::Ollama
+      when "lm_studio"
+        LLM::Providers::LMStudio
+      else
+        raise ArgumentError, "Unsupported chat provider: #{chat_config.fetch('chat_provider')}"
+      end
+    end
+
+    def chat_config
+      Rails.application.config.chat
     end
   end
 end

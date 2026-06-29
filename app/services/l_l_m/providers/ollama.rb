@@ -7,7 +7,7 @@ require "uri"
 module LLM
   module Providers
     class Ollama
-      def initialize(api_url:, model:, timeout_seconds: 60)
+      def initialize(api_url:, model:, timeout_seconds: 120)
         @uri = URI.parse(api_url)
         @model = model
         @timeout_seconds = timeout_seconds
@@ -44,7 +44,7 @@ module LLM
             stream: false,
             format: "json",
             options: {
-              temperature: 0.2
+              temperature: 0.1
             }
           }.to_json
         end

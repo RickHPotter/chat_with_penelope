@@ -1,6 +1,6 @@
 # Chat With Penelope
 
-A local Rails chatbot for practicing French with Ollama.
+A local Rails chatbot for practicing French with local LLM providers.
 
 The app is intentionally small:
 
@@ -9,7 +9,7 @@ The app is intentionally small:
 - no chat history UI
 - Hotwire for updates
 - TailwindCSS for styling
-- Ollama for local model inference
+- Ollama or LM Studio for local model inference
 
 ## What It Does
 
@@ -30,7 +30,7 @@ The app is intentionally small:
 - Solid Queue
 - Solid Cable
 - Solid Cache
-- Ollama
+- Ollama or LM Studio
 
 ## Requirements
 
@@ -45,11 +45,19 @@ The app reads these environment variables:
 
 - `CHAT_API_URL`
 - `CHAT_MODEL`
+- `CHAT_PROVIDER`
 
 Defaults:
 
+- `CHAT_PROVIDER=ollama`
 - `CHAT_API_URL=http://127.0.0.1:11434/api/generate`
 - `CHAT_MODEL=qwen3:8b`
+
+For LM Studio's OpenAI-compatible local server, use:
+
+- `CHAT_PROVIDER=lm_studio`
+- `CHAT_API_URL=http://127.0.0.1:1234/v1/chat/completions`
+- `CHAT_MODEL=frenchgemma-3-4b-instruct`
 
 The local `.env` file can be used during development.
 
@@ -88,14 +96,20 @@ Open the app at:
 http://localhost:3001
 ```
 
-## Ollama
+## Local LLM Provider
 
-The chatbot expects Ollama to be running locally and reachable at the configured API URL.
+The chatbot expects the configured local provider to be running and reachable at the configured API URL.
 
-If you use the default settings, make sure Ollama is available at:
+For Ollama defaults, make sure Ollama is available at:
 
 ```text
 http://127.0.0.1:11434
+```
+
+For LM Studio, start the local server and make sure the OpenAI-compatible endpoint is available at:
+
+```text
+http://127.0.0.1:1234/v1/chat/completions
 ```
 
 The app sends structured JSON prompts and expects a JSON response with:
@@ -136,7 +150,8 @@ The app tries to fail gracefully when Ollama is unavailable, times out, or retur
 - `ChatResponder` owns message persistence, prompt building, response parsing, and regeneration
 - `Prompts::Tutor` owns the system prompt
 - `LLM::Client` is the app-facing abstraction for model generation
-- `LLM::Providers::Ollama` is the current provider implementation
+- `LLM::Providers::Ollama` supports Ollama `/api/generate`
+- `LLM::Providers::LMStudio` supports LM Studio's OpenAI-compatible `/v1/chat/completions`
 
 That separation makes it easier to add future providers later without changing the rest of the chat flow.
 

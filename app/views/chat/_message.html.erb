@@ -48,6 +48,7 @@
               <dd>
                 mostly_french=<%= message.prompt_metadata.dig("classifier", "mostly_french") %>,
                 question=<%= message.prompt_metadata.dig("classifier", "question") %>,
+                provider=<%= message.prompt_metadata["llm_provider"] %>,
                 model=<%= message.prompt_metadata["llm_model"] %>
               </dd>
             </div>

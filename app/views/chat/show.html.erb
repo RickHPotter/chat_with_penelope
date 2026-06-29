@@ -6,7 +6,7 @@
         <h1 class="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">French Tutor</h1>
       </div>
       <div class="rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-sm text-sky-100">
-        Ollama: <%= Rails.application.config.chat["chat_model"] %>
+        <%= Rails.application.config.chat["chat_provider"].to_s.humanize %>: <%= Rails.application.config.chat["chat_model"] %>
       </div>
     </header>
 

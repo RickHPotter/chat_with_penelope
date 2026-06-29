@@ -166,13 +166,15 @@ class ChatResponder
   end
 
   def friendly_error_message(error)
+    chat_provider = Rails.application.config.chat.fetch("chat_provider")
+
     case error
     when LLM::Errors::ConnectionError
-      "Ollama is unavailable. Start Ollama and try again."
+      "#{chat_provider} is unavailable. Start #{chat_provider} and try again."
     when LLM::Errors::TimeoutError
-      "Ollama timed out. Try again with a smaller model or more time."
+      "#{chat_provider} timed out. Try again with a smaller model or more time."
     else
-      "Something went wrong while generating a reply."
+      "Something went wrong while generating a reply. #{error.message}"
     end
   end
 
@@ -182,6 +184,7 @@ class ChatResponder
     metadata = {
       classifier: classification.to_h,
       prompt_builder: prompt_builder_name_for(classification.intent),
+      llm_provider: Rails.configuration.chat.fetch("chat_provider"),
       llm_model: Rails.configuration.chat.fetch("chat_model")
     }
 
@@ -220,7 +223,7 @@ class ChatResponder
     warnings << "target_language contains same-language glosses" if target_language.match?(/\b(\p{L}+)\s*\(\1\)/i)
     warnings << "target_language contains same-language arrows" if target_language.match?(/([\p{L}'’ ]{3,})\s*→\s*\1/i)
     warnings << "default_language repeats translation explanation" if repeated_translation_explanation?(default_language)
-    warnings << "response contains duplicate alternatives" if [default_language, target_language].any? { |content| duplicate_alternative?(content) }
+    warnings << "response contains duplicate alternatives" if [ default_language, target_language ].any? { |content| duplicate_alternative?(content) }
 
     warnings
   end
