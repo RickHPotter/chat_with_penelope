@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class MessageClassifier
-  Result = Struct.new(:intent, :normalized_text, :matched_rule, :input_excerpt, :mostly_french, :question, keyword_init: true) do
+  Result = Struct.new(:intent, :normalized_text, :matched_rule, :input_excerpt, :mostly_french, :question, :lookup_mode, keyword_init: true) do
     def to_h
       {
         intent: intent.to_s,
@@ -9,7 +9,8 @@ class MessageClassifier
         matched_rule:,
         input_excerpt:,
         mostly_french:,
-        question:
+        question:,
+        lookup_mode:
       }
     end
   end
@@ -48,8 +49,10 @@ class MessageClassifier
 
     if translation?
       result(:translation, "translation_request")
+    elsif vocabulary_usage?
+      result(:vocabulary, "vocabulary_usage_question", lookup_mode: "usage")
     elsif vocabulary?
-      result(:vocabulary, "vocabulary_question")
+      result(:vocabulary, "vocabulary_question", input_excerpt: vocabulary_expression, lookup_mode: lookup_mode_for(vocabulary_expression))
     elsif french_validation_request?
       result(:french_sentence, "french_sentence_validation_request", input_excerpt: extracted_sentence)
     elsif grammar?
@@ -73,9 +76,41 @@ class MessageClassifier
 
   def vocabulary?
     starts_with_any?("define", "what does", "what is") ||
+      normalized.end_with?(" en français") ||
+      normalized.start_with?("en français ") ||
       normalized.include?("mean") ||
       normalized.include?("signifie") ||
       normalized.include?("veut dire")
+  end
+
+  def vocabulary_usage?
+    normalized.include?("what about") ||
+      normalized.include?("as in") ||
+      normalized.include?("wasn't") ||
+      normalized.include?("wasnt") ||
+      normalized.include?("doesn't") ||
+      normalized.include?("doesnt")
+  end
+
+  def vocabulary_expression
+    @vocabulary_expression ||= begin
+      expression = normalized
+        .sub(/\Adefine\s+/, "")
+        .sub(/\Awhat does\s+/, "")
+        .sub(/\Awhat is\s+/, "")
+        .sub(/\s+mean\??\z/, "")
+        .sub(/\s+en français\??\z/, "")
+        .sub(/\Aen français\s+/, "")
+        .sub(/\Aque veut dire\s+/, "")
+        .sub(/\Aqu'?est-ce que\s+/, "")
+        .sub(/\s+signifie\??\z/, "")
+
+      expression.presence || text
+    end
+  end
+
+  def lookup_mode_for(expression)
+    expression.to_s.scan(/[[:alpha:]']+/).size <= 1 ? "single_word" : "expression"
   end
 
   def grammar?
@@ -97,6 +132,8 @@ class MessageClassifier
     @extracted_sentence ||= begin
       if (match = text.match(/(?:->|:)\s*(.+)\z/))
         match[1].strip
+      elsif normalized.start_with?("validate ")
+        text.sub(/\Avalidate\s+/i, "").strip
       elsif (match = text.match(/["“](.+?)["”]/))
         match[1].strip
       else
@@ -107,6 +144,7 @@ class MessageClassifier
 
   def sentence_validation_request?
     normalized.include?("grammatically correct") ||
+      normalized.start_with?("validate ") ||
       normalized.include?("is this correct") ||
       normalized.include?("is it correct") ||
       normalized.include?("is this sentence correct") ||
@@ -142,14 +180,15 @@ class MessageClassifier
     prefixes.any? { |prefix| normalized.start_with?(prefix) }
   end
 
-  def result(intent, matched_rule, input_excerpt: text)
+  def result(intent, matched_rule, input_excerpt: text, lookup_mode: nil)
     Result.new(
       intent:,
       normalized_text: normalized,
       matched_rule:,
       input_excerpt:,
       mostly_french: mostly_french?,
-      question: question?
+      question: question?,
+      lookup_mode:
     )
   end
 end

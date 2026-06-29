@@ -67,6 +67,18 @@
           <dt class="font-semibold text-amber-100">Model</dt>
           <dd><%= message.prompt_metadata["llm_model"] %></dd>
         </div>
+        <% if message.prompt_metadata["prompt_digest"].present? %>
+          <div class="sm:col-span-2">
+            <dt class="font-semibold text-amber-100">Prompt digest</dt>
+            <dd class="break-all"><%= message.prompt_metadata["prompt_digest"] %></dd>
+          </div>
+        <% end %>
+        <% if message.prompt_metadata["parse_warnings"].present? || message.prompt_metadata["output_warnings"].present? %>
+          <div class="sm:col-span-2">
+            <dt class="font-semibold text-amber-100">Warnings</dt>
+            <dd><%= [*message.prompt_metadata["parse_warnings"], *message.prompt_metadata["output_warnings"]].join(", ") %></dd>
+          </div>
+        <% end %>
         <div class="sm:col-span-2">
           <dt class="font-semibold text-amber-100">Input excerpt</dt>
           <dd class="whitespace-pre-wrap"><%= message.prompt_metadata.dig("classifier", "input_excerpt") %></dd>

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "digest"
 
 class ChatResponder
   Result = Struct.new(:user_message, :response_message, :error_message, keyword_init: true) do
@@ -54,21 +55,23 @@ class ChatResponder
   attr_reader :chat, :client
 
   def generate_response_message(messages:, user_message:)
-    prompt_metadata = prompt_metadata_for(user_message)
+    prompt = Prompts::Tutor.build(chat:, user_message:, messages:)
+    prompt_metadata = prompt_metadata_for(user_message, prompt:)
     raw_response = client.generate(
-      prompt: Prompts::Tutor.build(chat:, user_message:, messages:)
+      prompt:
     )
 
     parsed = parse_structured_response(raw_response)
-    build_assistant_message(parsed, raw_response:, prompt_metadata:)
+    build_assistant_message(parsed, raw_response:, prompt_metadata: response_metadata(prompt_metadata, parsed))
   rescue LLM::Errors::MalformedResponseError
     build_assistant_fallback_message(raw_response:, prompt_metadata:)
   end
 
   def regenerate_assistant_message(assistant_message, messages:, user_message:)
-    prompt_metadata = prompt_metadata_for(user_message)
+    prompt = Prompts::Tutor.build(chat:, user_message:, messages:)
+    prompt_metadata = prompt_metadata_for(user_message, prompt:)
     raw_response = client.generate(
-      prompt: Prompts::Tutor.build(chat:, user_message:, messages:)
+      prompt:
     )
 
     parsed = parse_structured_response(raw_response)
@@ -76,7 +79,7 @@ class ChatResponder
       content_default_language: parsed.fetch(:default_language),
       content_target_language: parsed.fetch(:target_language),
       raw_response:,
-      prompt_metadata:
+      prompt_metadata: response_metadata(prompt_metadata, parsed)
     )
     assistant_message
   rescue LLM::Errors::MalformedResponseError
@@ -94,17 +97,32 @@ class ChatResponder
     candidate = outer_payload.is_a?(Hash) ? (outer_payload["response"] || raw_response) : raw_response
     inner_payload = candidate.is_a?(String) ? JSON.parse(candidate) : candidate
 
-    default_language = inner_payload.fetch("default_language").to_s.strip
-    target_language = inner_payload.fetch("target_language").to_s.strip
+    default_key = first_present_key(inner_payload, "default_language", "english_language", "default", "english")
+    target_key = first_present_key(inner_payload, "target_language", "french_language", "target", "french")
+
+    default_language = inner_payload.fetch(default_key).to_s.strip
+    target_language = inner_payload.fetch(target_key).to_s.strip
 
     raise LLM::Errors::MalformedResponseError, "Structured response is missing required target_language" if target_language.blank?
 
     {
       default_language:,
-      target_language:
+      target_language:,
+      parse_warnings: parse_warnings(default_key:, target_key:)
     }
   rescue JSON::ParserError, KeyError, TypeError => e
     raise LLM::Errors::MalformedResponseError, e.message
+  end
+
+  def first_present_key(payload, *keys)
+    keys.find { |key| payload.key?(key) }
+  end
+
+  def parse_warnings(default_key:, target_key:)
+    warnings = []
+    warnings << "used #{default_key} instead of default_language" unless default_key == "default_language"
+    warnings << "used #{target_key} instead of target_language" unless target_key == "target_language"
+    warnings
   end
 
   def build_assistant_message(parsed_response, raw_response:, prompt_metadata:)
@@ -158,14 +176,21 @@ class ChatResponder
     end
   end
 
-  def prompt_metadata_for(text)
+  def prompt_metadata_for(text, prompt: nil)
     classification = MessageClassifier.classify(text)
 
-    {
+    metadata = {
       classifier: classification.to_h,
       prompt_builder: prompt_builder_name_for(classification.intent),
       llm_model: Rails.configuration.chat.fetch("chat_model")
     }
+
+    if prompt
+      metadata[:prompt_digest] = Digest::SHA256.hexdigest(prompt)
+      metadata[:prompt_preview] = prompt.first(2_000)
+    end
+
+    metadata
   end
 
   def prompt_builder_name_for(intent)
@@ -177,5 +202,37 @@ class ChatResponder
       translation: "Prompts::Translation",
       conversation: "Prompts::Tutor legacy fallback"
     }.fetch(intent)
+  end
+
+  def response_metadata(prompt_metadata, parsed_response)
+    prompt_metadata.merge(
+      parse_warnings: parsed_response.fetch(:parse_warnings),
+      output_warnings: output_warnings_for(parsed_response)
+    )
+  end
+
+  def output_warnings_for(parsed_response)
+    warnings = []
+    default_language = parsed_response.fetch(:default_language)
+    target_language = parsed_response.fetch(:target_language)
+
+    warnings << "target_language contains D'umas" if target_language.match?(/D'umas/i)
+    warnings << "target_language contains same-language glosses" if target_language.match?(/\b(\p{L}+)\s*\(\1\)/i)
+    warnings << "target_language contains same-language arrows" if target_language.match?(/([\p{L}'’ ]{3,})\s*→\s*\1/i)
+    warnings << "default_language repeats translation explanation" if repeated_translation_explanation?(default_language)
+    warnings << "response contains duplicate alternatives" if [default_language, target_language].any? { |content| duplicate_alternative?(content) }
+
+    warnings
+  end
+
+  def duplicate_alternative?(content)
+    content.scan(/['«"]([^'»"]+)['»"]\s+or\s+['«"]\1['»"]/i).any?
+  end
+
+  def repeated_translation_explanation?(content)
+    translation = content[/Translation:\s*(.+)/i, 1]
+    explanation = content[/Translation explanation:\s*(.+)/i, 1]
+
+    translation.present? && explanation.present? && translation.strip == explanation.strip
   end
 end

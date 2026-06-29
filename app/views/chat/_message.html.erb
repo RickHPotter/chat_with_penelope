@@ -27,6 +27,18 @@
               <dt class="font-semibold">Prompt builder</dt>
               <dd><%= message.prompt_metadata["prompt_builder"] %></dd>
             </div>
+            <% if message.prompt_metadata["prompt_digest"].present? %>
+              <div>
+                <dt class="font-semibold">Prompt digest</dt>
+                <dd class="break-all"><%= message.prompt_metadata["prompt_digest"] %></dd>
+              </div>
+            <% end %>
+            <% if message.prompt_metadata["parse_warnings"].present? || message.prompt_metadata["output_warnings"].present? %>
+              <div>
+                <dt class="font-semibold">Warnings</dt>
+                <dd><%= [*message.prompt_metadata["parse_warnings"], *message.prompt_metadata["output_warnings"]].join(", ") %></dd>
+              </div>
+            <% end %>
             <div>
               <dt class="font-semibold">Input excerpt</dt>
               <dd class="whitespace-pre-wrap"><%= message.prompt_metadata.dig("classifier", "input_excerpt") %></dd>

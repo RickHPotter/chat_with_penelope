@@ -12,7 +12,7 @@ class PromptsTutorTest < ActiveSupport::TestCase
 
     assert_includes prompt, "The learner has submitted a French sentence."
     assert_includes prompt, "Sentence:"
-    assert_includes prompt, "# Grammar Validation"
+    assert_includes prompt, "# Correction"
     assert_includes prompt, "The value of `default_language` must contain the full answer in English."
     assert_includes prompt, "The value of `target_language` must contain the same full answer in French."
     assert_includes prompt, '"default_language": string'
@@ -28,6 +28,7 @@ class PromptsTutorTest < ActiveSupport::TestCase
     assert_includes prompt, "The learner has submitted a French sentence."
     assert_includes prompt, "Sentence:\n\nJ'habite en rue Dumas"
     assert_includes prompt, "do not write entries like `rue (street)`"
+    assert_includes prompt, "do not write entries like `Je (je)`"
     assert_no_match(/Sentence:\n\nis this grammatically correct/, prompt)
   end
 
@@ -37,6 +38,31 @@ class PromptsTutorTest < ActiveSupport::TestCase
     assert_includes prompt, "The learner has asked a vocabulary question."
     assert_includes prompt, "Expression:"
     assert_includes prompt, "# Word or Expression"
+  end
+
+  test "vocabulary prompt includes lookup mode for single words" do
+    prompt = Prompts::Tutor.build(chat: @chat, user_message: "straight en français", messages: [])
+
+    assert_includes prompt, "The learner has asked a vocabulary question."
+    assert_includes prompt, "Expression:\n\nstraight"
+    assert_includes prompt, "Lookup mode:\n\nsingle_word"
+    assert_includes prompt, "Acknowledge when the word has multiple common meanings."
+    assert_includes prompt, "Le mot anglais **straight**"
+    assert_includes prompt, "Do not write same-language arrows"
+    assert_includes prompt, "Do not use property names like french_language"
+  end
+
+  test "vocabulary prompt includes usage mode instructions for follow-up questions" do
+    prompt = Prompts::Tutor.build(
+      chat: @chat,
+      user_message: "wasnt droit the translation for right? what about straight as in going straight in the street",
+      messages: []
+    )
+
+    assert_includes prompt, "The learner has asked a vocabulary question."
+    assert_includes prompt, "Lookup mode:\n\nusage"
+    assert_includes prompt, "For street directions, prefer `tout droit`"
+    assert_includes prompt, "For right side, prefer `à droite`"
   end
 
   test "dispatches English sentences to the English sentence prompt" do

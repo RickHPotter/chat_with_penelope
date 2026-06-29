@@ -22,6 +22,8 @@ module Prompts
 
         Do not write patterns like `la rue (street)` in `target_language`.
 
+        Do not write same-language arrows like `une ligne droite → une ligne droite` in `target_language`.
+
         #{conversation_section}
 
         Direction:

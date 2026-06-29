@@ -82,6 +82,45 @@ class ChatResponderTest < ActiveSupport::TestCase
     assert_equal "Je suis fatigué.", result.response_message.content_target_language
   end
 
+  test "submit_message repairs common language key aliases and stores warnings" do
+    chat = Chat.create!(title: "French Tutor", target_language: "fr")
+    response = JSON.generate(
+      response: JSON.generate(
+        default_language: "English answer.",
+        french_language: "Réponse française."
+      )
+    )
+    client = FakeClient.new(->(_prompt) { response })
+
+    result = ChatResponder.new(chat:, client:).submit_message(content: "straight en français")
+
+    assert result.success?
+    assert_equal "English answer.", result.response_message.content_default_language
+    assert_equal "Réponse française.", result.response_message.content_target_language
+    assert_includes result.response_message.prompt_metadata.fetch("parse_warnings"), "used french_language instead of target_language"
+    assert result.response_message.prompt_metadata.fetch("prompt_digest").present?
+    assert result.response_message.prompt_metadata.fetch("prompt_preview").present?
+  end
+
+  test "submit_message stores output warnings for suspicious response patterns" do
+    chat = Chat.create!(title: "French Tutor", target_language: "fr")
+    response = JSON.generate(
+      response: JSON.generate(
+        default_language: "The correct sentence is 'A' or 'A'.",
+        target_language: "La phrase est « J'habite rue D'umas ». rue (rue)"
+      )
+    )
+    client = FakeClient.new(->(_prompt) { response })
+
+    result = ChatResponder.new(chat:, client:).submit_message(content: "is this grammatically correct? -> J'habite en rue Dumas")
+
+    warnings = result.response_message.prompt_metadata.fetch("output_warnings")
+
+    assert_includes warnings, "target_language contains D'umas"
+    assert_includes warnings, "target_language contains same-language glosses"
+    assert_includes warnings, "response contains duplicate alternatives"
+  end
+
   test "submit_message returns a system message when the provider is unavailable" do
     chat = Chat.create!(title: "French Tutor", target_language: "fr")
     client = FakeClient.new(->(_prompt) { raise LLM::Errors::ConnectionError, "down" })

@@ -22,6 +22,8 @@ module Prompts
 
         Do not write patterns like `rue (street)` or `J'habite (I live)` in `target_language`.
 
+        Do not write same-language arrows like `C'est la rue correcte → C'est la rue correcte` in `target_language`.
+
         Use this structure.
 
         # Rule

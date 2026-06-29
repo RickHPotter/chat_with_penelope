@@ -53,6 +53,9 @@ module Prompts
         * The `target_language` value must be written in #{target_language}.
         * When writing in #{target_language}, do not add English translations in parentheses after #{target_language} words.
         * When writing in English, it is acceptable to include #{target_language} terms with English explanations.
+        * In `target_language`, do not translate #{target_language} examples into #{target_language} again.
+        * In `target_language`, avoid arrows like `une ligne droite → une ligne droite`.
+        * If `default_language` contains English-to-#{target_language} example pairs, rewrite them in `target_language` as #{target_language}-only examples with #{target_language} explanations.
 
         ## Output format
 
@@ -69,7 +72,29 @@ module Prompts
           "target_language": string
         }
 
+        The property names must be exactly:
+
+        * default_language
+        * target_language
+
+        Do not use property names like french_language, english_language, source_language, target, or translation.
+
         Markdown may be used inside the JSON strings.
+      PROMPT
+    end
+
+    def strict_json_reminder
+      <<~PROMPT
+        Final output reminder:
+
+        Return exactly one JSON object with exactly these property names:
+
+        {
+          "default_language": "...",
+          "target_language": "..."
+        }
+
+        Do not use property names like french_language, english_language, source_language, target, or translation.
       PROMPT
     end
 
@@ -77,7 +102,7 @@ module Prompts
       <<~PROMPT
         Conversation history:
 
-        #{conversation.presence || "None"}
+        #{conversation.presence || 'None'}
       PROMPT
     end
 
