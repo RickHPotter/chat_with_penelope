@@ -5,7 +5,11 @@ export default class extends Controller {
 
   connect() {
     this.observer = new MutationObserver(() => this.scrollBottom())
-    this.observer.observe(this.element, { childList: true, subtree: true })
+    this.observer.observe(this.element, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    })
     this.scrollBottom()
   }
 
@@ -14,8 +18,14 @@ export default class extends Controller {
   }
 
   scrollBottom() {
-    setTimeout(() => {
-      this.element.scrollTop = this.element.scrollHeight
-    }, this.delayValue)
+    setTimeout(() => this.forceBottom(), this.delayValue)
+    requestAnimationFrame(() => this.forceBottom())
+    requestAnimationFrame(() => requestAnimationFrame(() => this.forceBottom()))
+  }
+
+  forceBottom() {
+    this.element.scrollTop = this.element.scrollHeight
+    document.documentElement.scrollTop = document.documentElement.scrollHeight
+    document.body.scrollTop = document.body.scrollHeight
   }
 }

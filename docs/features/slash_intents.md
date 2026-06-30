@@ -92,6 +92,19 @@ placeholders literally. Compact prompts should include bad/good examples.
 - [x] Streaming response placeholders added.
 - [x] Thinking output displayed in a collapsible block when the model emits `<think>...</think>`.
 - [x] Cancellation route added for in-flight generation.
+- [x] Composer supports Enter-to-send, modified Enter for new lines, and a slash-command autocomplete menu.
+
+## Composer UX
+
+The message input is optimized for action-based prompts:
+
+- `Enter` submits the message.
+- `Shift+Enter` and `Ctrl+Enter` insert a line break.
+- Typing `/` at the start of the message opens an action menu.
+- The menu shows at most four matching actions.
+- `ArrowUp` and `ArrowDown` move the highlighted action.
+- `Tab` autocompletes the highlighted action.
+- `Enter` also accepts the highlighted action while the menu is open.
 
 ## Streaming And Cancellation
 

@@ -96,10 +96,37 @@ class PromptsTutorTest < ActiveSupport::TestCase
   test "uses compact define prompt for define slash command" do
     prompt = Prompts::Tutor.build(chat: @chat, user_message: "/define straight", messages: [])
 
-    assert_includes prompt, "Task: explain this French vocabulary item"
+    assert_includes prompt, "Task: define one vocabulary item for a French learner."
     assert_includes prompt, "Expression:\nstraight"
+    assert_includes prompt, "If the expression is French, explain that exact French word/expression."
+    assert_includes prompt, "Use `Le mot anglais ...` only when the submitted expression itself is English."
     assert_includes prompt, "For `droit`, mention straight/right/law/rights"
     assert_no_match(/The learner has asked a vocabulary question/, prompt)
+  end
+
+  test "compact define prompt prevents French source direction inversion" do
+    prompt = Prompts::Tutor.build(chat: @chat, user_message: "/define gauche", messages: [])
+
+    assert_includes prompt, "Expression:\ngauche"
+    assert_includes prompt, "For `gauche`, do not start the French answer with `Le mot anglais \"left\"`."
+    assert_includes prompt, "In the French answer, start with the submitted expression when it is French."
+    assert_includes prompt, "`gauche` = adjective/noun/direction word, not just `left`."
+  end
+
+  test "compact prompts stay below local model prompt budget" do
+    messages = [
+      "/validate J'habite en rue Dumas",
+      "/define gauche",
+      "/explain le passé composé",
+      "/translate Je suis fatigué",
+      "/say I am tired"
+    ]
+
+    messages.each do |message|
+      prompt = Prompts::Tutor.build(chat: @chat, user_message: message, messages: [])
+
+      assert_operator prompt.split.size, :<, 1_500, "Expected #{message} prompt to stay below 1,500 words"
+    end
   end
 
   test "uses compact explain prompt for explain slash command" do

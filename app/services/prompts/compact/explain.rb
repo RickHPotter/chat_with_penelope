@@ -3,6 +3,7 @@
 module Prompts
   module Compact
     class Explain < Base
+      # Prompt budget: keep the complete prompt below 1,500 words for local models.
       def build
         <<~PROMPT
           #{compact_base_prompt}

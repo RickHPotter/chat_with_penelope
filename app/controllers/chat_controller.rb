@@ -13,7 +13,7 @@ class ChatController < ApplicationController
     if result.response_message.present?
       render turbo_stream: create_message_stream(result), status: :ok
     else
-      render turbo_stream: turbo_stream.replace(
+      render turbo_stream: turbo_stream.update(
         "chat_errors",
         partial: "chat/errors",
         locals: { error_message: result.error_message }
@@ -59,8 +59,8 @@ class ChatController < ApplicationController
     streams = [
       turbo_stream.append("messages", partial: "chat/message", locals: { message: result.user_message }),
       turbo_stream.append("messages", partial: "chat/message", locals: { message: result.response_message }),
-      turbo_stream.replace("composer", partial: "chat/composer", locals: { chat: @chat, message: Message.new }),
-      turbo_stream.replace("chat_errors", partial: "chat/errors", locals: { error_message: nil })
+      turbo_stream.update("composer", partial: "chat/composer", locals: { chat: @chat, message: Message.new }),
+      turbo_stream.update("chat_errors", partial: "chat/errors", locals: { error_message: nil })
     ]
 
     streams
@@ -73,7 +73,7 @@ class ChatController < ApplicationController
         partial: "chat/message",
         locals: { message: result.response_message }
       ),
-      turbo_stream.replace("chat_errors", partial: "chat/errors", locals: { error_message: nil })
+      turbo_stream.update("chat_errors", partial: "chat/errors", locals: { error_message: nil })
     ]
   end
 end

@@ -1,14 +1,75 @@
-<%= form_with url: chat_messages_path, scope: :message, method: :post, class: "pb-4" do |form| %>
-  <div class="rounded-3xl border border-white/10 bg-white/5 p-3 shadow-2xl shadow-black/10">
+<%= form_with url: chat_messages_path,
+  scope: :message,
+  method: :post,
+  class: "pb-4",
+  data: {
+    controller: "composer",
+    composer_actions_value: [
+      {
+        command: "validate",
+        intent: "Grammar check",
+        hint: "Correct one French sentence",
+        example: "/validate J'habite en rue Dumas"
+      },
+      {
+        command: "define",
+        intent: "Definition",
+        hint: "Explain a French word or expression",
+        example: "/define rue"
+      },
+      {
+        command: "explain",
+        intent: "Grammar explanation",
+        hint: "Explain a French grammar topic",
+        example: "/explain le passé composé"
+      },
+      {
+        command: "translate",
+        intent: "Translation",
+        hint: "Translate explicit text",
+        example: "/translate I live on Dumas street"
+      },
+      {
+        command: "say",
+        intent: "Say in French",
+        hint: "Turn English into natural French",
+        example: "/say I am tired"
+      },
+      {
+        command: "chat",
+        intent: "Tutor chat",
+        hint: "Ask a general tutor question",
+        example: "/chat how should I study verbs?"
+      }
+    ].to_json
+  } do |form| %>
+  <div class="relative rounded-3xl border border-white/10 bg-white/5 p-3 shadow-2xl shadow-black/10">
     <label class="sr-only" for="message_content">Message</label>
     <%= form.text_area :content,
       id: "message_content",
       rows: 3,
       placeholder: "Ask in English or French...",
       autofocus: true,
-      class: "block w-full resize-none rounded-2xl border-0 bg-slate-950/80 px-4 py-3 text-base text-white placeholder:text-slate-500 focus:ring-2 focus:ring-sky-400" %>
+      class: "block w-full resize-none rounded-2xl border-0 bg-slate-950/80 px-4 py-3 text-base text-white placeholder:text-slate-500 focus:ring-2 focus:ring-sky-400",
+      data: {
+        composer_target: "input",
+        action: "keydown->composer#keydown input->composer#input focus->composer#input blur->composer#blur"
+      } %>
 
-    <div class="mt-3 flex items-center justify-end">
+    <div class="absolute inset-x-3 bottom-16 z-20 hidden overflow-hidden rounded-3xl border border-sky-300/20 bg-slate-950/95 shadow-2xl shadow-sky-950/40 ring-1 ring-white/10 backdrop-blur-xl"
+         data-composer-target="menu">
+      <div class="border-b border-white/10 bg-white/[0.03] px-4 py-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-sky-200/80">Actions</p>
+        <p class="mt-1 text-xs text-slate-400">Use arrows to navigate, Tab or Enter to autocomplete.</p>
+      </div>
+      <div class="max-h-80 overflow-y-auto p-2" data-composer-target="options"></div>
+    </div>
+
+    <div class="mt-3 flex items-center justify-between gap-3">
+      <p class="text-xs text-slate-500">
+        <span class="text-slate-300">Enter</span> sends.
+        <span class="text-slate-300">Shift</span>/<span class="text-slate-300">Ctrl</span> + Enter adds a line.
+      </p>
       <%= form.submit "Send",
         class: "inline-flex items-center rounded-full bg-sky-400 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-sky-300" %>
     </div>

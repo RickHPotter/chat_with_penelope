@@ -4,6 +4,9 @@
 
 import { application } from "./application"
 
+import ComposerController from "./composer_controller"
+application.register("composer", ComposerController)
+
 import MessageController from "./message_controller"
 application.register("message", MessageController)
 

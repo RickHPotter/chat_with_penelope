@@ -1,0 +1,78 @@
+Biggest weakness
+
+The pattern I see is this:
+
+# Analyse
+
+Je : I
+
+ouvre : open
+
+porte : door
+
+That's translation.
+
+Not grammar.
+
+For a tutor I'd rather see
+
+Je — subject pronoun
+
+ouvre — present tense of ouvrir
+
+la — definite article
+
+porte — feminine noun
+
+de — preposition
+
+la maison — noun phrase
+
+This teaches French.
+
+Another thing I'd improve
+
+Your answers always end with
+
+Plus naturel :
+
+Sometimes that's great.
+
+Sometimes there isn't a more natural alternative.
+
+I'd make it conditional.
+
+Only include it if
+
+there's an idiom,
+or a common spoken alternative.
+
+Otherwise omit it.
+
+One feature I'd absolutely add
+
+Confidence.
+
+Example:
+
+# Correction
+
+✅ Incorrect
+
+Confidence: High
+
+Corrected sentence:
+
+...
+
+or
+
+# Confidence
+
+High
+
+If the model is unsure, it could say
+
+Medium
+
+That would help you identify hallucinations during testing.
