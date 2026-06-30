@@ -10,6 +10,14 @@ module LLM
       @provider.generate(prompt:)
     end
 
+    def generate_stream(prompt:, &block)
+      if @provider.respond_to?(:generate_stream)
+        @provider.generate_stream(prompt:, &block)
+      else
+        block.call(@provider.generate(prompt:))
+      end
+    end
+
     private
 
     def default_provider

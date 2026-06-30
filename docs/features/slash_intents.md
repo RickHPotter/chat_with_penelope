@@ -89,6 +89,42 @@ placeholders literally. Compact prompts should include bad/good examples.
 - [x] Tests added.
 - [x] Placeholder-only JSON examples removed from compact prompts.
 - [x] Prompt generation made independent from conversation history.
+- [x] Streaming response placeholders added.
+- [x] Thinking output displayed in a collapsible block when the model emits `<think>...</think>`.
+- [x] Cancellation route added for in-flight generation.
+
+## Streaming And Cancellation
+
+The browser should not wait for a full 8k-token response before seeing output.
+
+Current flow:
+
+1. The controller stores the user message.
+2. The controller stores a placeholder assistant message with `generation_status: generating`.
+3. `GenerateAssistantResponseJob` streams provider chunks into that assistant message.
+4. The UI receives Turbo Stream replacements for the assistant message.
+5. If the model emits `<think>...</think>`, the thinking content appears in a collapsed `Thinking` block.
+6. The user can press `Cancel`, which sets a cancellation flag checked between chunks.
+
+Notes:
+
+- Streaming is currently provider-dependent.
+- LM Studio streaming uses its OpenAI-compatible SSE chunk format.
+- LM Studio uses the Responses API shape (`/v1/responses`) because
+  `reasoning: { "effort": "none" }` is honored there. If configuration still
+  points to `/v1/chat/completions`, the provider normalizes the path to
+  `/v1/responses`.
+- Prompts explicitly forbid chain-of-thought or `<think>` output. LM Studio
+  does not use Ollama's `/no_think` control token, so the LM Studio provider
+  sends the prompt unchanged.
+- Stream updates append raw escaped chunks into stable per-message DOM targets
+  for target/default/thinking content. The app should not replace the whole
+  message card for every token.
+- If final JSON parsing fails, the message displays raw model output or raw
+  model thinking instead of a generic parse-failure apology.
+- If a provider does not support streaming, `LLM::Client#generate_stream` falls back to one full response chunk.
+- Development uses Action Cable's `async` adapter for local browser streaming.
+- Production can continue using Solid Cable once its cable schema/migrations are configured.
 
 ## Open Questions
 

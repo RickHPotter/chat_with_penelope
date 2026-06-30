@@ -70,6 +70,8 @@ module Prompts
         - The French reply should be a faithful translation of the English reply.
         - Markdown is allowed inside the strings when useful.
         - Do not include explanations or reasoning.
+        - Do not reason step by step.
+        - Do not output thinking, hidden reasoning, or `<think>` blocks.
         - The JSON must be valid and parseable.
         - When the learner asks a general question about something not related to #{target_language}, answer it as a tutor would, not as a refusal.
 

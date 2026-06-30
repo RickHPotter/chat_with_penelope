@@ -8,6 +8,8 @@
 #  id                       :bigint           not null, primary key
 #  content_default_language :text
 #  content_target_language  :text
+#  content_thinking         :text
+#  generation_status        :string           default("complete"), not null
 #  prompt_metadata          :jsonb            not null
 #  raw_response             :text
 #  role                     :string
@@ -43,6 +45,22 @@ class Message < ApplicationRecord
 
   def system?
     role == "system"
+  end
+
+  def generating?
+    generation_status == "generating"
+  end
+
+  def cancelling?
+    generation_status == "cancelling"
+  end
+
+  def cancelled?
+    generation_status == "cancelled"
+  end
+
+  def complete?
+    generation_status == "complete"
   end
 
   def default_language_content

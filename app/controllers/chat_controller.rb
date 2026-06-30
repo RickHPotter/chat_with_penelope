@@ -8,7 +8,7 @@ class ChatController < ApplicationController
   end
 
   def create_message
-    result = ChatResponder.new(chat: @chat).submit_message(content: message_params[:content])
+    result = ChatResponder.new(chat: @chat).submit_message_async(content: message_params[:content])
 
     if result.response_message.present?
       render turbo_stream: create_message_stream(result), status: :ok
@@ -33,6 +33,16 @@ class ChatController < ApplicationController
         locals: { message: result.response_message }
       ), status: :ok
     end
+  end
+
+  def cancel
+    message = ChatResponder.new(chat: @chat).cancel_generation(message_id: params[:id])
+
+    render turbo_stream: turbo_stream.replace(
+      helpers.dom_id(message),
+      partial: "chat/message",
+      locals: { message: }
+    ), status: :ok
   end
 
   private

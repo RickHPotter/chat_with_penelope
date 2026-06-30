@@ -21,6 +21,8 @@ module Prompts
           - Never set `target_language` to the word "French".
           - In French output, do not add English translations in parentheses after French words.
           - Keep the answer concise and beginner-friendly.
+          - Do not reason step by step.
+          - Do not output thinking, hidden reasoning, or `<think>` blocks.
 
           Bad output:
           {"default_language":"English","target_language":"French"}

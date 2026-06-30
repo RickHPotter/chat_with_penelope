@@ -10,6 +10,8 @@ require "test_helper"
 #  id                       :bigint           not null, primary key
 #  content_default_language :text
 #  content_target_language  :text
+#  content_thinking         :text
+#  generation_status        :string           default("complete"), not null
 #  prompt_metadata          :jsonb            not null
 #  raw_response             :text
 #  role                     :string

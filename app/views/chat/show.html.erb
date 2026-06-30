@@ -1,4 +1,6 @@
 <div class="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.12),_transparent_35%),linear-gradient(180deg,_#020617_0%,_#020617_100%)]">
+  <%= turbo_stream_from [@chat, "messages"] %>
+
   <main class="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-4 sm:px-6 lg:px-8">
     <header class="mb-4 flex items-center justify-between border-b border-white/10 pb-4">
       <div>
@@ -10,7 +12,10 @@
       </div>
     </header>
 
-    <section id="messages" class="flex-1 space-y-4 overflow-y-auto py-4">
+    <section id="messages"
+             class="flex-1 space-y-4 overflow-y-auto py-4"
+             data-controller="scroll"
+             data-scroll-delay-value="25">
       <% @messages.each do |message| %>
         <%= render "chat/message", message: message %>
       <% end %>

@@ -14,6 +14,8 @@
 class Chat < ApplicationRecord
   has_many :messages, dependent: :destroy
 
+  broadcasts_to ->(chat) { [ chat, "messages" ] }
+
   validates :title, :target_language, presence: true
 
   def self.default_chat

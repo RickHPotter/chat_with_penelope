@@ -118,8 +118,7 @@ class PromptsTutorTest < ActiveSupport::TestCase
 
     prompt = Prompts::Tutor.build(chat: @chat, user_message: "Je suis fatigué.", messages: [message])
 
-    assert_includes prompt, "Conversation history:"
-    assert_includes prompt, "None"
+    assert_no_match(/Conversation history:/, prompt)
     assert_no_match(/Learner: Bonjour/, prompt)
   end
 end
