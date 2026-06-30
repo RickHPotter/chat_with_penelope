@@ -15,7 +15,7 @@ module LLM
 
       def generate(prompt:)
         response = http.request(build_request(prompt))
-        File.write(File.join(Rails.root, "tmp", "lm_studio_prompt.txt"), prompt, mode: "a")
+        File.write(File.join(Rails.root, "tmp", "lm_studio_prompt.txt"), prompt, mode: "w")
 
         raise LLM::Errors::ProviderError, "LM Studio returned HTTP #{response.code} with body #{response.body}" unless response.is_a?(Net::HTTPSuccess)
 
@@ -47,7 +47,7 @@ module LLM
               }
             ],
             temperature: 0.1,
-            stream: true,
+            stream: false,
             response_format: json_schema_response_format
           }.to_json
         end

@@ -46,6 +46,25 @@ class MessageClassifierTest < ActiveSupport::TestCase
     assert_equal "usage", classification.lookup_mode
   end
 
+  test "classifies slash commands before heuristics" do
+    classification = MessageClassifier.classify("/validate J'habite en rue Dumas")
+
+    assert_equal :french_sentence, classification.intent
+    assert_equal "slash_command", classification.matched_rule
+    assert_equal "validate", classification.command
+    assert classification.compact
+    assert_equal "J'habite en rue Dumas", classification.input_excerpt
+  end
+
+  test "classifies slash define as compact vocabulary" do
+    classification = MessageClassifier.classify("/define straight")
+
+    assert_equal :vocabulary, classification.intent
+    assert_equal "define", classification.command
+    assert_equal "single_word", classification.lookup_mode
+    assert classification.compact
+  end
+
   test "classifies translation requests" do
     assert_equal :translation, MessageClassifier.call("Translate je suis fatigué")
     assert_equal :translation, MessageClassifier.call("How do you say I am tired?")

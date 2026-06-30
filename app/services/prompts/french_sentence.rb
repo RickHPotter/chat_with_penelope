@@ -85,8 +85,6 @@ module Prompts
         * In `target_language`, do not write entries like `Je (je)`, `rue (rue)`, or `correcte (correcte)`.
         * In `target_language`, do not use bilingual arrows unless the two sides are different languages.
 
-        #{conversation_section}
-
         Sentence:
 
         #{user_message}

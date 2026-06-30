@@ -36,8 +36,6 @@ module Prompts
 
         Prefer natural French over literal translations.
 
-        #{conversation_section}
-
         Sentence:
 
         #{user_message}

@@ -50,8 +50,6 @@ module Prompts
 
         If multiple correct forms exist, explain which one is most common in France.
 
-        #{conversation_section}
-
         Question:
 
         #{user_message}

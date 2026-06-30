@@ -15,7 +15,7 @@ module LLM
 
       def generate(prompt:)
         response = http.request(build_request(prompt))
-        File.write(File.join(Rails.root, "tmp", "ollama_prompt.txt"), prompt, mode: "a")
+        File.write(File.join(Rails.root, "tmp", "ollama_prompt.txt"), prompt, mode: "w")
 
         raise LLM::Errors::ProviderError, "Ollama returned HTTP #{response.code}" unless response.is_a?(Net::HTTPSuccess)
 

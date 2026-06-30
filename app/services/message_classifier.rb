@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class MessageClassifier
-  Result = Struct.new(:intent, :normalized_text, :matched_rule, :input_excerpt, :mostly_french, :question, :lookup_mode, keyword_init: true) do
+  Result = Struct.new(:intent, :normalized_text, :matched_rule, :input_excerpt, :mostly_french, :question, :lookup_mode, :command, :compact, keyword_init: true) do
     def to_h
       {
         intent: intent.to_s,
@@ -10,7 +10,9 @@ class MessageClassifier
         input_excerpt:,
         mostly_french:,
         question:,
-        lookup_mode:
+        lookup_mode:,
+        command:,
+        compact:
       }
     end
   end
@@ -45,6 +47,9 @@ class MessageClassifier
   end
 
   def classify
+    command = CommandParser.call(text)
+    return command_result(command) if command.matched?
+
     return result(:conversation, "blank", input_excerpt: "") if normalized.blank?
 
     if translation?
@@ -188,7 +193,23 @@ class MessageClassifier
       input_excerpt:,
       mostly_french: mostly_french?,
       question: question?,
-      lookup_mode:
+      lookup_mode:,
+      command: nil,
+      compact: false
+    )
+  end
+
+  def command_result(command)
+    Result.new(
+      intent: command.intent,
+      normalized_text: normalized,
+      matched_rule: "slash_command",
+      input_excerpt: command.input,
+      mostly_french: MessageClassifier.mostly_french?(command.input),
+      question: command.input.end_with?("?"),
+      lookup_mode: command.intent == :vocabulary ? lookup_mode_for(command.input) : nil,
+      command: command.command,
+      compact: true
     )
   end
 end

@@ -35,6 +35,31 @@ class ChatResponderTest < ActiveSupport::TestCase
     assert_equal response, result.response_message.raw_response
   end
 
+  test "submit_message does not send previous conversation in prompt" do
+    chat = Chat.create!(title: "French Tutor", target_language: "fr")
+    chat.messages.create!(
+      role: "user",
+      content_default_language: "Previous private turn",
+      content_target_language: "Previous private turn"
+    )
+    captured_prompt = nil
+    response = JSON.generate(
+      response: JSON.generate(
+        default_language: "Incorrect.",
+        target_language: "Incorrect."
+      )
+    )
+    client = FakeClient.new(->(prompt) do
+      captured_prompt = prompt
+      response
+    end)
+
+    ChatResponder.new(chat:, client:).submit_message(content: "/validate J'habite en rue Dumas")
+
+    assert_no_match(/Previous private turn/, captured_prompt)
+    assert_includes captured_prompt, "J'habite en rue Dumas"
+  end
+
   test "regenerate_message overwrites the existing assistant message" do
     chat = Chat.create!(title: "French Tutor", target_language: "fr")
     user = chat.messages.create!(
@@ -102,6 +127,25 @@ class ChatResponderTest < ActiveSupport::TestCase
     assert result.response_message.prompt_metadata.fetch("prompt_preview").present?
   end
 
+  test "submit_message stores slash command metadata" do
+    chat = Chat.create!(title: "French Tutor", target_language: "fr")
+    response = JSON.generate(
+      response: JSON.generate(
+        default_language: "Incorrect.",
+        target_language: "Incorrect."
+      )
+    )
+    client = FakeClient.new(->(_prompt) { response })
+
+    result = ChatResponder.new(chat:, client:).submit_message(content: "/validate J'habite en rue Dumas")
+
+    assert result.success?
+    assert_equal "validate", result.response_message.prompt_metadata.fetch("slash_command")
+    assert_equal true, result.response_message.prompt_metadata.fetch("compact_prompt")
+    assert_equal "slash_command", result.response_message.prompt_metadata.dig("classifier", "matched_rule")
+    assert_equal "Prompts::Compact::Validate", result.response_message.prompt_metadata.fetch("prompt_builder")
+  end
+
   test "submit_message stores output warnings for suspicious response patterns" do
     chat = Chat.create!(title: "French Tutor", target_language: "fr")
     response = JSON.generate(
@@ -119,6 +163,34 @@ class ChatResponderTest < ActiveSupport::TestCase
     assert_includes warnings, "target_language contains D'umas"
     assert_includes warnings, "target_language contains same-language glosses"
     assert_includes warnings, "response contains duplicate alternatives"
+  end
+
+  test "submit_message stores output warning for literal language name response" do
+    chat = Chat.create!(title: "French Tutor", target_language: "fr")
+    response = JSON.generate(
+      response: JSON.generate(
+        default_language: "English",
+        target_language: "French"
+      )
+    )
+    client = FakeClient.new(->(_prompt) { response })
+
+    result = ChatResponder.new(chat:, client:).submit_message(content: "/validate J'habite en rue Dumas")
+
+    assert_includes result.response_message.prompt_metadata.fetch("output_warnings"), "response contains literal language names instead of answers"
+  end
+
+  test "submit_message fallback stores synthetic raw response when provider raises malformed response" do
+    chat = Chat.create!(title: "French Tutor", target_language: "fr")
+    client = FakeClient.new(->(_prompt) { raise LLM::Errors::MalformedResponseError, "bad provider body" })
+
+    result = ChatResponder.new(chat:, client:).submit_message(content: "/validate J'habite en rue Dumas")
+
+    assert result.success?
+    assert_equal ChatResponder::FALLBACK_DEFAULT_MESSAGE, result.response_message.content_default_language
+    assert_equal ChatResponder::FALLBACK_TARGET_MESSAGE, result.response_message.content_target_language
+    assert_equal "LLM::Errors::MalformedResponseError", JSON.parse(result.response_message.raw_response).fetch("error")
+    assert_includes result.response_message.prompt_metadata.fetch("parse_warnings"), "bad provider body"
   end
 
   test "submit_message returns a system message when the provider is unavailable" do

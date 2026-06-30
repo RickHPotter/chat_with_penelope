@@ -113,8 +113,6 @@ module Prompts
 
         Write explanations for beginner learners.
 
-        #{conversation_section}
-
         Expression:
 
         #{user_message}

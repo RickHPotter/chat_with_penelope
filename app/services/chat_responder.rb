@@ -29,7 +29,7 @@ class ChatResponder
       prompt_metadata: prompt_metadata_for(text)
     )
 
-    response_message = generate_response_message(messages: conversation_for(user_message), user_message: text)
+    response_message = generate_response_message(user_message: text)
     Result.new(user_message:, response_message:)
   rescue LLM::Errors::Error => e
     Result.new(user_message:, response_message: build_system_message(friendly_error_message(e)))
@@ -41,7 +41,6 @@ class ChatResponder
 
     response_message = regenerate_assistant_message(
       assistant_message,
-      messages: conversation_before(assistant_message),
       user_message: last_user_message_for(assistant_message)
     )
 
@@ -54,8 +53,8 @@ class ChatResponder
 
   attr_reader :chat, :client
 
-  def generate_response_message(messages:, user_message:)
-    prompt = Prompts::Tutor.build(chat:, user_message:, messages:)
+  def generate_response_message(user_message:)
+    prompt = Prompts::Tutor.build(chat:, user_message:, messages: [])
     prompt_metadata = prompt_metadata_for(user_message, prompt:)
     raw_response = client.generate(
       prompt:
@@ -63,12 +62,12 @@ class ChatResponder
 
     parsed = parse_structured_response(raw_response)
     build_assistant_message(parsed, raw_response:, prompt_metadata: response_metadata(prompt_metadata, parsed))
-  rescue LLM::Errors::MalformedResponseError
-    build_assistant_fallback_message(raw_response:, prompt_metadata:)
+  rescue LLM::Errors::MalformedResponseError => e
+    build_assistant_fallback_message(raw_response: fallback_raw_response(raw_response, e), prompt_metadata: fallback_metadata(prompt_metadata, e))
   end
 
-  def regenerate_assistant_message(assistant_message, messages:, user_message:)
-    prompt = Prompts::Tutor.build(chat:, user_message:, messages:)
+  def regenerate_assistant_message(assistant_message, user_message:)
+    prompt = Prompts::Tutor.build(chat:, user_message:, messages: [])
     prompt_metadata = prompt_metadata_for(user_message, prompt:)
     raw_response = client.generate(
       prompt:
@@ -82,12 +81,12 @@ class ChatResponder
       prompt_metadata: response_metadata(prompt_metadata, parsed)
     )
     assistant_message
-  rescue LLM::Errors::MalformedResponseError
+  rescue LLM::Errors::MalformedResponseError => e
     assistant_message.update!(
       content_default_language: FALLBACK_DEFAULT_MESSAGE,
       content_target_language: FALLBACK_TARGET_MESSAGE,
-      raw_response:,
-      prompt_metadata:
+      raw_response: fallback_raw_response(raw_response, e),
+      prompt_metadata: fallback_metadata(prompt_metadata, e)
     )
     assistant_message
   end
@@ -145,16 +144,28 @@ class ChatResponder
     )
   end
 
+  def fallback_raw_response(raw_response, error)
+    return raw_response if raw_response.present?
+
+    {
+      error: error.class.name,
+      message: error.message
+    }.to_json
+  end
+
+  def fallback_metadata(prompt_metadata, error)
+    prompt_metadata.merge(
+      parse_warnings: [ error.message ],
+      output_warnings: [ "model response could not be parsed" ]
+    )
+  end
+
   def build_system_message(message)
     chat.messages.create!(
       role: "system",
       content_default_language: message,
       content_target_language: message
     )
-  end
-
-  def conversation_for(message)
-    chat.messages.chronological.select { |item| item.id <= message.id }
   end
 
   def conversation_before(message)
@@ -183,7 +194,9 @@ class ChatResponder
 
     metadata = {
       classifier: classification.to_h,
-      prompt_builder: prompt_builder_name_for(classification.intent),
+      prompt_builder: prompt_builder_name_for(classification),
+      compact_prompt: classification.compact,
+      slash_command: classification.command,
       llm_provider: Rails.configuration.chat.fetch("chat_provider"),
       llm_model: Rails.configuration.chat.fetch("chat_model")
     }
@@ -196,7 +209,19 @@ class ChatResponder
     metadata
   end
 
-  def prompt_builder_name_for(intent)
+  def prompt_builder_name_for(classification)
+    if classification.compact
+      return {
+        "validate" => "Prompts::Compact::Validate",
+        "check" => "Prompts::Compact::Validate",
+        "correct" => "Prompts::Compact::Validate",
+        "define" => "Prompts::Compact::Define",
+        "explain" => "Prompts::Compact::Explain",
+        "translate" => "Prompts::Compact::Translate",
+        "say" => "Prompts::Compact::Say"
+      }.fetch(classification.command, "Prompts::Compact")
+    end
+
     {
       french_sentence: "Prompts::FrenchSentence",
       english_sentence: "Prompts::EnglishSentence",
@@ -204,7 +229,7 @@ class ChatResponder
       grammar: "Prompts::Grammar",
       translation: "Prompts::Translation",
       conversation: "Prompts::Tutor legacy fallback"
-    }.fetch(intent)
+    }.fetch(classification.intent)
   end
 
   def response_metadata(prompt_metadata, parsed_response)
@@ -224,6 +249,7 @@ class ChatResponder
     warnings << "target_language contains same-language arrows" if target_language.match?(/([\p{L}'’ ]{3,})\s*→\s*\1/i)
     warnings << "default_language repeats translation explanation" if repeated_translation_explanation?(default_language)
     warnings << "response contains duplicate alternatives" if [ default_language, target_language ].any? { |content| duplicate_alternative?(content) }
+    warnings << "response contains literal language names instead of answers" if default_language == "English" && target_language == "French"
 
     warnings
   end

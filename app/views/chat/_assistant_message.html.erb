@@ -63,6 +63,12 @@
           <dt class="font-semibold text-amber-100">Prompt builder</dt>
           <dd><%= message.prompt_metadata["prompt_builder"] %></dd>
         </div>
+        <% if message.prompt_metadata["slash_command"].present? %>
+          <div>
+            <dt class="font-semibold text-amber-100">Slash command</dt>
+            <dd>/<%= message.prompt_metadata["slash_command"] %> compact=<%= message.prompt_metadata["compact_prompt"] %></dd>
+          </div>
+        <% end %>
         <div>
           <dt class="font-semibold text-amber-100">Provider</dt>
           <dd><%= message.prompt_metadata["llm_provider"] %></dd>

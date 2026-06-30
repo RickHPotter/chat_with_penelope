@@ -24,8 +24,6 @@ module Prompts
 
         Do not write same-language arrows like `une ligne droite → une ligne droite` in `target_language`.
 
-        #{conversation_section}
-
         Direction:
 
         #{direction_label}

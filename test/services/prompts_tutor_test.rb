@@ -80,7 +80,36 @@ class PromptsTutorTest < ActiveSupport::TestCase
     assert_includes prompt, "Learner message:"
   end
 
-  test "includes existing conversation history" do
+  test "uses compact validate prompt for validate slash command" do
+    prompt = Prompts::Tutor.build(chat: @chat, user_message: "/validate J'habite en rue Dumas", messages: [])
+
+    assert_includes prompt, "Task: validate this French sentence."
+    assert_includes prompt, "Sentence:\nJ'habite en rue Dumas"
+    assert_includes prompt, "Bad output:"
+    assert_includes prompt, '{"default_language":"English","target_language":"French"}'
+    assert_includes prompt, "Your answer must discuss this exact sentence, not the JSON schema."
+    assert_includes prompt, "Mention whether `J'habite en rue Dumas` is correct or incorrect."
+    assert_includes prompt, "The values must be the actual tutor answer text, not language names."
+    assert_no_match(/The learner has submitted a French sentence/, prompt)
+  end
+
+  test "uses compact define prompt for define slash command" do
+    prompt = Prompts::Tutor.build(chat: @chat, user_message: "/define straight", messages: [])
+
+    assert_includes prompt, "Task: explain this French vocabulary item"
+    assert_includes prompt, "Expression:\nstraight"
+    assert_includes prompt, "For `droit`, mention straight/right/law/rights"
+    assert_no_match(/The learner has asked a vocabulary question/, prompt)
+  end
+
+  test "uses compact explain prompt for explain slash command" do
+    prompt = Prompts::Tutor.build(chat: @chat, user_message: "/explain le passé composé", messages: [])
+
+    assert_includes prompt, "Task: explain this French grammar topic."
+    assert_includes prompt, "Topic/question:\nle passé composé"
+  end
+
+  test "does not include existing conversation history" do
     message = @chat.messages.create!(
       role: "user",
       content_default_language: "Bonjour",
@@ -90,6 +119,7 @@ class PromptsTutorTest < ActiveSupport::TestCase
     prompt = Prompts::Tutor.build(chat: @chat, user_message: "Je suis fatigué.", messages: [message])
 
     assert_includes prompt, "Conversation history:"
-    assert_includes prompt, "Learner: Bonjour"
+    assert_includes prompt, "None"
+    assert_no_match(/Learner: Bonjour/, prompt)
   end
 end

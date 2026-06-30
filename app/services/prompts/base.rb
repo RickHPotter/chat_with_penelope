@@ -13,10 +13,6 @@ module Prompts
       new(chat:, user_message:, messages:).build
     end
 
-    def self.build_conversation(messages)
-      new(chat: nil, user_message: nil, messages:).send(:conversation)
-    end
-
     def initialize(chat:, user_message:, messages: [])
       @chat = chat
       @user_message = user_message
@@ -96,18 +92,6 @@ module Prompts
 
         Do not use property names like french_language, english_language, source_language, target, or translation.
       PROMPT
-    end
-
-    def conversation_section
-      <<~PROMPT
-        Conversation history:
-
-        #{conversation.presence || 'None'}
-      PROMPT
-    end
-
-    def conversation
-      messages.map { |message| build_turn(message) }.join("\n\n")
     end
 
     def build_turn(message)

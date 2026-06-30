@@ -9,25 +9,39 @@ module Prompts
       classification = MessageClassifier.classify(user_message)
       intent = classification.intent
 
-      return legacy_build(chat:, user_message:, messages:) if intent == :conversation
+      return legacy_build(chat:, user_message:) if intent == :conversation
 
-      builder_for(intent).build(chat:, user_message: classification.input_excerpt, messages:)
+      builder_for(classification).build(chat:, user_message: classification.input_excerpt, messages:)
     end
 
-    def self.builder_for(intent)
+    def self.builder_for(classification)
+      return compact_builder_for(classification.command) if classification.compact
+
       {
         french_sentence: Prompts::FrenchSentence,
         english_sentence: Prompts::EnglishSentence,
         vocabulary: Prompts::Vocabulary,
         grammar: Prompts::Grammar,
         translation: Prompts::Translation
-      }.fetch(intent)
+      }.fetch(classification.intent)
     end
     private_class_method :builder_for
 
-    def self.legacy_build(chat:, user_message:, messages: [])
+    def self.compact_builder_for(command)
+      {
+        "validate" => Prompts::Compact::Validate,
+        "check" => Prompts::Compact::Validate,
+        "correct" => Prompts::Compact::Validate,
+        "define" => Prompts::Compact::Define,
+        "explain" => Prompts::Compact::Explain,
+        "translate" => Prompts::Compact::Translate,
+        "say" => Prompts::Compact::Say
+      }.fetch(command)
+    end
+    private_class_method :compact_builder_for
+
+    def self.legacy_build(chat:, user_message:)
       target_language = LANGUAGE_NAMES.fetch(chat.target_language, chat.target_language)
-      conversation = Prompts::Base.build_conversation(messages)
 
       <<~PROMPT
         You are a patient French tutor.
@@ -68,9 +82,6 @@ module Prompts
           "default_language": "Hi! How can I help you learn French today?",
           "target_language": "Bonjour ! Comment puis-je vous aider à apprendre le français aujourd'hui ?"
         }
-
-        Conversation so far:
-        #{conversation.presence || 'None'}
 
         Learner message:
         #{user_message}
