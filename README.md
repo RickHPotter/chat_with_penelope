@@ -1,65 +1,145 @@
 # Chat With Penelope
 
-A local Rails chatbot for practicing French with local LLM providers.
+A local Rails app for practicing French with action-based tutor prompts, local
+LLMs, streaming replies, and optional local text-to-speech.
 
 The app is intentionally small:
 
 - one shared conversation
 - no authentication
-- no chat history UI
-- Hotwire for updates
+- Hotwire for realtime updates
 - TailwindCSS for styling
+- PostgreSQL-backed Rails data
+- Solid Queue jobs
+- Solid Cable broadcasts
 - Ollama or LM Studio for local model inference
 
-## What It Does
+## Features
 
-- Accepts a single shared stream of messages
-- Sends user input to a local Ollama instance
-- Stores both the raw model response and the parsed assistant reply
-- Shows assistant responses in English and French
-- Lets you toggle between the two languages without another request
-- Lets you copy the currently visible language
-- Lets you reprompt an assistant message in place
+- Slash-command tutor actions:
+  - `/validate <French sentence>`
+  - `/define <word or expression>`
+  - `/explain <grammar topic or question>`
+  - `/translate <text>`
+  - `/say <French sentence>`
+  - `/chat <message>`
+- Aliases:
+  - `/check` -> `/validate`
+  - `/correct` -> `/validate`
+- Streaming assistant responses with cancellable generation.
+- Collapsible thinking/debug output when a provider emits reasoning chunks.
+- English/French answer tabs for text responses.
+- Copy, reprompt, cancel, and debug controls.
+- Composer autocomplete for slash commands.
+- Enter-to-send, with `Shift+Enter` or `Ctrl+Enter` for a line break.
+- Markdown-like rendering for headings, bullets, bold text, and inline code.
+- `/say` audio generation through a local TTS API.
 
-## Tech Stack
+## Slash Actions
 
-- Ruby on Rails 8.1
-- Hotwire (Turbo + Stimulus)
-- TailwindCSS
-- PostgreSQL
-- Solid Queue
-- Solid Cable
-- Solid Cache
-- Ollama or LM Studio
+Slash commands are the main interaction model. Each command creates an
+independent prompt; previous conversation turns are not sent to the model.
 
-## Requirements
+That is deliberate:
 
-- Ruby
-- Bundler
-- PostgreSQL
-- Ollama running locally
+- small local models behave better with compact task prompts
+- old turns can pollute the current answer
+- debugging is easier when each request depends only on the current input
+
+Heuristic intent detection still exists as a compatibility path, but new prompt
+work should target slash actions.
+
+## Providers
+
+### Ollama
+
+Default configuration:
+
+```bash
+CHAT_PROVIDER=ollama
+CHAT_API_URL=http://127.0.0.1:11434/api/generate
+CHAT_MODEL=qwen3:8b
+```
+
+### LM Studio
+
+LM Studio should run its local server on port `1234`.
+
+Example configuration:
+
+```bash
+CHAT_PROVIDER=lm_studio
+CHAT_API_URL=http://127.0.0.1:1234/v1/chat/completions
+CHAT_MODEL=google/gemma-4-12b-qat
+```
+
+The app normalizes LM Studio `/v1/chat/completions` URLs to the Responses API
+shape internally because `/v1/responses` supports:
+
+```json
+{ "reasoning": { "effort": "none" } }
+```
+
+LM Studio responses are requested with streaming enabled. The provider parses
+Responses API SSE events and stores the raw streamed content for debugging.
+
+## Text-To-Speech
+
+`/say <French sentence>` generates audio instead of a normal text tutor answer.
+
+Flow:
+
+1. The text after `/say` is cleaned before synthesis.
+2. Cleanup uses a small LLM prompt to normalize punctuation and apostrophes.
+3. If cleanup parsing fails, deterministic cleanup still fixes common issues:
+   backticks/curly apostrophes and obvious elisions such as `Jhabite`.
+4. The app calls the local TTS API.
+5. The generated WAV is written under `public/tts`.
+6. The assistant message renders an audio player and download link.
+
+Expected TTS endpoint:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/synthesize" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_text": "Ceci est très facile maintenant !",
+    "output_path": "/absolute/path/to/output.wav"
+  }'
+```
+
+TTS environment variables:
+
+```bash
+TTS_API_URL=http://127.0.0.1:8000/synthesize
+TTS_OPEN_TIMEOUT=5
+TTS_READ_TIMEOUT=120
+TTS_WRITE_TIMEOUT=30
+```
+
+If synthesis takes longer than two minutes, increase `TTS_READ_TIMEOUT`.
+
+Important: the TTS process must be able to write to the absolute `output_path`
+sent by Rails. If TTS runs in a container, mount the app's `public/tts`
+directory into that container.
 
 ## Configuration
 
 The app reads these environment variables:
 
-- `CHAT_API_URL`
-- `CHAT_MODEL`
-- `CHAT_PROVIDER`
+```bash
+CHAT_PROVIDER=ollama
+CHAT_API_URL=http://127.0.0.1:11434/api/generate
+CHAT_MODEL=qwen3:8b
+CHAT_MAX_TOKENS=70
 
-Defaults:
+TTS_API_URL=http://127.0.0.1:8000/synthesize
+TTS_OPEN_TIMEOUT=5
+TTS_READ_TIMEOUT=120
+TTS_WRITE_TIMEOUT=30
+```
 
-- `CHAT_PROVIDER=ollama`
-- `CHAT_API_URL=http://127.0.0.1:11434/api/generate`
-- `CHAT_MODEL=qwen3:8b`
-
-For LM Studio's OpenAI-compatible local server, use:
-
-- `CHAT_PROVIDER=lm_studio`
-- `CHAT_API_URL=http://127.0.0.1:1234/v1/chat/completions`
-- `CHAT_MODEL=frenchgemma-3-4b-instruct`
-
-The local `.env` file can be used during development.
+Use a local `.env` file during development if desired.
 
 ## Setup
 
@@ -67,14 +147,21 @@ The local `.env` file can be used during development.
 bin/setup
 ```
 
-If you prefer to do it manually:
+Manual setup:
 
 ```bash
 bundle install
 bin/rails db:prepare
+bin/rails db:schema:load:cable
 ```
 
-## Running The App
+Run migrations after pulling schema changes:
+
+```bash
+bin/rails db:migrate
+```
+
+## Running
 
 Start the full development stack:
 
@@ -82,84 +169,41 @@ Start the full development stack:
 bin/dev
 ```
 
-This starts the web server and the job worker defined in `Procfile.dev`.
+`bin/dev` starts:
 
-If you want to run the worker separately:
+- Rails web server
+- Solid Queue worker
+- Tailwind watcher
+- JavaScript build watcher
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+If you run Rails without `bin/dev`, start the job worker separately:
 
 ```bash
 bin/jobs start
 ```
 
-Open the app at:
+## Realtime Notes
 
-```text
-http://localhost:3001
-```
+Development and production use Solid Cable. The cable database schema must exist
+or broadcasts from Solid Queue workers will not reach the browser.
 
-## Local LLM Provider
+If streaming updates do not appear:
 
-The chatbot expects the configured local provider to be running and reachable at the configured API URL.
-
-For Ollama defaults, make sure Ollama is available at:
-
-```text
-http://127.0.0.1:11434
-```
-
-For LM Studio, start the local server and make sure the OpenAI-compatible endpoint is available at:
-
-```text
-http://127.0.0.1:1234/v1/chat/completions
-```
-
-The app sends structured JSON prompts and expects a JSON response with:
-
-- `default_language`
-- `target_language`
-
-The raw response is preserved in the database as `raw_response`.
-
-## App Behavior
-
-### Messages
-
-- User messages are stored as plain chat messages
-- Assistant messages store:
-  - English content in `content_default_language`
-  - French content in `content_target_language`
-  - the untouched model output in `raw_response`
-
-### Assistant Actions
-
-Each assistant message includes:
-
-- `Copy`
-- `Reprompt`
-
-`Copy` copies the currently visible language only.
-
-`Reprompt` regenerates that message in place using the conversation up to, but not including, the assistant message being regenerated.
-
-### Error Handling
-
-The app tries to fail gracefully when Ollama is unavailable, times out, or returns malformed JSON. Friendly errors are shown inside the chat instead of crashing the page.
-
-## Architecture Notes
-
-- `ChatController` stays thin and only coordinates requests and Turbo Streams
-- `ChatResponder` owns message persistence, prompt building, response parsing, and regeneration
-- `Prompts::Tutor` owns the system prompt
-- `LLM::Client` is the app-facing abstraction for model generation
-- `LLM::Providers::Ollama` supports Ollama `/api/generate`
-- `LLM::Providers::LMStudio` supports LM Studio's OpenAI-compatible `/v1/chat/completions`
-
-That separation makes it easier to add future providers later without changing the rest of the chat flow.
+- run `bin/rails db:schema:load:cable`
+- restart `bin/dev`
+- make sure the Solid Queue worker is running
 
 ## Data Model
 
 ### `Chat`
 
-The app uses one shared chat record. The model is already structured so multiple chats can be added later if needed.
+The app currently uses one shared chat record.
 
 ### `Message`
 
@@ -168,23 +212,41 @@ Messages store:
 - `role`
 - `content_default_language`
 - `content_target_language`
+- `content_thinking`
 - `raw_response`
+- `prompt_metadata`
+- `generation_status`
+- `audio_url`
+
+`raw_response` preserves provider output or TTS metadata for debugging.
+`prompt_metadata` stores classifier, prompt, provider, and debug information.
+
+## Architecture
+
+- `ChatController` handles request/response coordination and Turbo Streams.
+- `ChatResponder` owns message persistence, generation, streaming, parsing,
+  cancellation, and TTS orchestration.
+- `MessageClassifier` classifies legacy messages and slash commands.
+- `CommandParser` parses explicit slash actions.
+- `Prompts::Tutor` dispatches to intent-specific prompt builders.
+- `Prompts::Compact::*` contains slash-action prompts.
+- `LLM::Client` abstracts provider calls.
+- `LLM::Providers::Ollama` supports Ollama.
+- `LLM::Providers::LMStudio` supports LM Studio Responses API streaming.
+- `TextToSpeech::Client` calls the local TTS API.
 
 ## Development Commands
 
 ```bash
 bin/rails test
-bin/rubocop
 bin/rails db:migrate
-bin/rails db:seed
+bin/rails db:schema:load:cable
+bin/rubocop
 ```
 
-## Notes
+## Maintained Docs
 
-This project is an MVP. It is designed to stay simple now while leaving room for:
+- `docs/features/slash_intents.md`
 
-- multiple providers
-- streaming
-- text-to-speech
-- long-term tutoring memory
-- richer assistant message formats
+Older prompt scratch notes were removed once their recommendations were either
+implemented or superseded.

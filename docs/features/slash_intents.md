@@ -156,12 +156,11 @@ Notes:
 - If final JSON parsing fails, the message displays raw model output or raw
   model thinking instead of a generic parse-failure apology.
 - If a provider does not support streaming, `LLM::Client#generate_stream` falls back to one full response chunk.
-- Development uses Action Cable's `async` adapter for local browser streaming.
-- Production can continue using Solid Cable once its cable schema/migrations are configured.
+- Development and production use Solid Cable. The cable schema must be loaded so
+  broadcasts from the Solid Queue worker can reach the browser.
 
-## Open Questions
+## Current Direction
 
-- Whether to enforce slash commands in the UI composer.
-- Whether to add structured response sections later.
-- Whether LM Studio should use JSON schema mode once its exact supported schema
-  shape is verified.
+- Slash commands are the preferred UI path.
+- Compact prompts are the preferred prompt path.
+- `/say` is treated as audio generation, not translation.
