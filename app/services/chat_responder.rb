@@ -15,9 +15,10 @@ class ChatResponder
   STREAMING_DEFAULT_MESSAGE = "Generating response..."
   STREAMING_TARGET_MESSAGE = "Génération de la réponse..."
 
-  def initialize(chat:, client: LLM::Client.new)
+  def initialize(chat:, client: LLM::Client.new, tts_client: TextToSpeech::Client.new)
     @chat = chat
     @client = client
+    @tts_client = tts_client
   end
 
   def submit_message(content:)
@@ -68,6 +69,8 @@ class ChatResponder
   end
 
   def stream_response_into(assistant_message:, user_message:)
+    return stream_say_response_into(assistant_message:, user_message:) if say_command?(user_message)
+
     prompt = Prompts::Tutor.build(chat:, user_message:, messages: [])
     prompt_metadata = prompt_metadata_for(user_message, prompt:)
     buffer = +""
@@ -167,7 +170,7 @@ class ChatResponder
 
   private
 
-  attr_reader :chat, :client
+  attr_reader :chat, :client, :tts_client
 
   def generate_response_message(user_message:)
     prompt = Prompts::Tutor.build(chat:, user_message:, messages: [])
@@ -193,6 +196,116 @@ class ChatResponder
       generation_status: "generating",
       prompt_metadata: prompt_metadata_for(user_message, prompt:)
     )
+  end
+
+  def stream_say_response_into(assistant_message:, user_message:)
+    prompt_metadata = prompt_metadata_for(user_message).merge(
+      prompt_builder: "TextToSpeech::Client",
+      audio_generation: true
+    )
+    source_text = CommandParser.call(user_message).input.presence || user_message.to_s
+    cleaned_text = clean_speech_text(source_text)
+    tts_result = tts_client.synthesize(
+      input_text: cleaned_text,
+      output_basename: "message_#{assistant_message.id}.wav"
+    )
+
+    assistant_message.update!(
+      content_default_language: "",
+      content_target_language: audio_message_content(cleaned_text),
+      audio_url: tts_result.audio_url,
+      generation_status: "complete",
+      raw_response: {
+        response: cleaned_text,
+        tts: {
+          input_text: tts_result.input_text,
+          output_path: tts_result.output_path,
+          audio_url: tts_result.audio_url,
+          response_body: tts_result.response_body
+        }
+      }.to_json,
+      prompt_metadata: prompt_metadata.merge(
+        tts_input_text: cleaned_text,
+        tts_audio_url: tts_result.audio_url,
+        output_warnings: cleanup_warnings(source_text, cleaned_text)
+      )
+    )
+    broadcast_message(assistant_message)
+    assistant_message
+  rescue TextToSpeech::Error, LLM::Errors::Error => e
+    assistant_message.update!(
+      content_default_language: "Audio generation failed: #{e.message}",
+      content_target_language: "La génération audio a échoué : #{e.message}",
+      generation_status: "complete",
+      raw_response: { error: e.class.name, message: e.message }.to_json,
+      prompt_metadata: prompt_metadata_for(user_message).merge(
+        audio_generation: true,
+        output_warnings: [ "audio generation failed" ]
+      )
+    )
+    broadcast_message(assistant_message)
+    assistant_message
+  end
+
+  def clean_speech_text(source_text)
+    llm_cleaned_text(source_text).presence || deterministic_speech_cleanup(source_text)
+  end
+
+  def llm_cleaned_text(source_text)
+    raw_response = client.generate(prompt: speech_cleanup_prompt(source_text))
+    parsed = parse_structured_response(raw_response)
+    deterministic_speech_cleanup(parsed.fetch(:target_language))
+  rescue LLM::Errors::Error
+    nil
+  end
+
+  def speech_cleanup_prompt(source_text)
+    <<~PROMPT
+      You clean French text before text-to-speech.
+
+      Return exactly one valid JSON object with:
+      {
+        "default_language": "",
+        "target_language": "cleaned French sentence"
+      }
+
+      Rules:
+      - Keep the same meaning.
+      - Do not translate.
+      - Fix apostrophes and obvious spacing only.
+      - Use normal apostrophe `'`, never backtick `.
+      - Fix common elisions like `Jhabite` to `J'habite` when obvious.
+      - Do not add explanations.
+
+      Text:
+      #{source_text}
+    PROMPT
+  end
+
+  def deterministic_speech_cleanup(text)
+    cleaned = text.to_s.strip.tr("`´’‘", "'")
+    cleaned = cleaned.gsub(/\s+/, " ")
+    cleaned = cleaned.gsub(/\b([Jj])(?=ai|aime|adore|arrive|attends|ouvre|habite|emprunte|étais|etais|écoute|ecoute)/, "\\1'")
+    cleaned = cleaned.gsub(/\b([CcDdLlMmNnQqSsTt])\s+'/, "\\1'")
+    cleaned
+  end
+
+  def audio_message_content(cleaned_text)
+    <<~TEXT.strip
+      # Audio
+      #{cleaned_text}
+    TEXT
+  end
+
+  def cleanup_warnings(source_text, cleaned_text)
+    return [] if source_text == cleaned_text
+
+    [ "speech text cleaned before TTS" ]
+  end
+
+  def say_command?(text)
+    command = CommandParser.call(text)
+    command.matched? && command.command == "say"
   end
 
   def parse_structured_response(raw_response)

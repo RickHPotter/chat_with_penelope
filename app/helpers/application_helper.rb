@@ -46,6 +46,7 @@ module ApplicationHelper
       id: message.id,
       role: message.role,
       generation_status: message.generation_status,
+      audio_url: message.audio_url,
       content_default_language: message.content_default_language,
       content_target_language: message.content_target_language,
       content_thinking: message.content_thinking,

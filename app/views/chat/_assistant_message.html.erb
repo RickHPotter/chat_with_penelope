@@ -30,6 +30,21 @@
   </div>
 
   <div class="px-4 py-4">
+    <% if message.audio? %>
+      <div class="mb-4 rounded-3xl border border-sky-300/20 bg-sky-300/10 p-3">
+        <div class="mb-2 flex items-center justify-between gap-3">
+          <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-100">Audio</p>
+          <%= link_to "Download",
+            message.audio_url,
+            download: true,
+            class: "rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100 transition hover:bg-sky-300/10" %>
+        </div>
+        <audio controls preload="metadata" class="w-full">
+          <source src="<%= message.audio_url %>" type="audio/wav">
+        </audio>
+      </div>
+    <% end %>
+
     <% if message.content_thinking.present? %>
       <details class="mb-4 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-xs leading-6 text-slate-300">
         <summary class="cursor-pointer font-semibold text-slate-100">Thinking</summary>

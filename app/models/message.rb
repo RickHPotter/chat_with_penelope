@@ -6,6 +6,7 @@
 # Database name: primary
 #
 #  id                       :bigint           not null, primary key
+#  audio_url                :string
 #  content_default_language :text
 #  content_target_language  :text
 #  content_thinking         :text
@@ -73,5 +74,9 @@ class Message < ApplicationRecord
 
   def target_language_name
     Prompts::Tutor::LANGUAGE_NAMES.fetch(chat.target_language, chat.target_language)
+  end
+
+  def audio?
+    audio_url.present?
   end
 end

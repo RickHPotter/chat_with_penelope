@@ -16,7 +16,7 @@ Initial commands:
 - `/define <word or expression>`: explain vocabulary.
 - `/explain <grammar topic or question>`: explain grammar.
 - `/translate <text>`: translate explicitly.
-- `/say <English sentence>`: translate an English sentence naturally into French.
+- `/say <French sentence>`: generate spoken French audio after cleaning punctuation.
 - `/chat <message>`: general tutor conversation fallback.
 
 Aliases:
@@ -93,6 +93,26 @@ placeholders literally. Compact prompts should include bad/good examples.
 - [x] Thinking output displayed in a collapsible block when the model emits `<think>...</think>`.
 - [x] Cancellation route added for in-flight generation.
 - [x] Composer supports Enter-to-send, modified Enter for new lines, and a slash-command autocomplete menu.
+- [x] `/say` generates audio through the local TTS API.
+
+## Audio
+
+`/say <text>` is an audio action.
+
+Flow:
+
+1. The message after `/say` is cleaned before TTS.
+2. Cleanup uses a small LLM prompt to normalize punctuation and apostrophes without translating.
+3. If cleanup parsing fails, deterministic cleanup still replaces backticks/curly apostrophes and fixes obvious elisions such as `Jhabite`.
+4. The app calls `POST /synthesize` on the local TTS API.
+5. The generated WAV is stored under `public/tts` and displayed with an audio player.
+
+Configuration:
+
+- `TTS_API_URL` defaults to `http://127.0.0.1:8000/synthesize`.
+- `TTS_OPEN_TIMEOUT` defaults to `5` seconds.
+- `TTS_READ_TIMEOUT` defaults to `120` seconds.
+- `TTS_WRITE_TIMEOUT` defaults to `30` seconds.
 
 ## Composer UX
 

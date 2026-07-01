@@ -8,6 +8,7 @@ require "test_helper"
 # Database name: primary
 #
 #  id                       :bigint           not null, primary key
+#  audio_url                :string
 #  content_default_language :text
 #  content_target_language  :text
 #  content_thinking         :text

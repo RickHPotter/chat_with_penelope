@@ -26,6 +26,26 @@ class ChatResponderTest < ActiveSupport::TestCase
     end
   end
 
+  class FakeTTSClient
+    Result = Struct.new(:input_text, :output_path, :audio_url, :response_body, keyword_init: true)
+
+    attr_reader :requests
+
+    def initialize
+      @requests = []
+    end
+
+    def synthesize(input_text:, output_basename:)
+      @requests << { input_text:, output_basename: }
+      Result.new(
+        input_text:,
+        output_path: Rails.root.join("public", "tts", output_basename).to_s,
+        audio_url: "/tts/#{output_basename}",
+        response_body: "{}"
+      )
+    end
+  end
+
   test "submit_message creates a user message and an assistant reply" do
     chat = Chat.create!(title: "French Tutor", target_language: "fr")
     response = JSON.generate(
@@ -106,6 +126,62 @@ class ChatResponderTest < ActiveSupport::TestCase
     assert_equal "complete", assistant.generation_status
     assert_equal "Correct sentence: J'habite rue Dumas.", assistant.content_default_language
     assert_equal "Phrase correcte : J'habite rue Dumas.", assistant.content_target_language
+  end
+
+  test "stream_response_into handles say command by cleaning text and attaching audio url" do
+    chat = Chat.create!(title: "French Tutor", target_language: "fr")
+    assistant = chat.messages.create!(
+      role: "assistant",
+      content_default_language: ChatResponder::STREAMING_DEFAULT_MESSAGE,
+      content_target_language: ChatResponder::STREAMING_TARGET_MESSAGE,
+      raw_response: JSON.generate(response: ""),
+      generation_status: "generating"
+    )
+    response = JSON.generate(
+      response: JSON.generate(
+        default_language: "",
+        target_language: "J'habite rue Dumas."
+      )
+    )
+    client = FakeClient.new(->(prompt) do
+      assert_includes prompt, "You clean French text before text-to-speech."
+      response
+    end)
+    tts_client = FakeTTSClient.new
+
+    ChatResponder.new(chat:, client:, tts_client:).stream_response_into(
+      assistant_message: assistant,
+      user_message: "/say Jhabite rue Dumas."
+    )
+
+    assistant.reload
+    assert_equal "complete", assistant.generation_status
+    assert_equal "", assistant.content_default_language
+    assert_equal "# Audio\nJ'habite rue Dumas.", assistant.content_target_language
+    assert_equal "/tts/message_#{assistant.id}.wav", assistant.audio_url
+    assert_equal "J'habite rue Dumas.", tts_client.requests.first.fetch(:input_text)
+    assert_equal true, assistant.prompt_metadata.fetch("audio_generation")
+    assert_equal "/tts/message_#{assistant.id}.wav", assistant.prompt_metadata.fetch("tts_audio_url")
+  end
+
+  test "say command falls back to deterministic cleanup when llm cleanup is malformed" do
+    chat = Chat.create!(title: "French Tutor", target_language: "fr")
+    assistant = chat.messages.create!(
+      role: "assistant",
+      content_default_language: ChatResponder::STREAMING_DEFAULT_MESSAGE,
+      content_target_language: ChatResponder::STREAMING_TARGET_MESSAGE,
+      raw_response: JSON.generate(response: ""),
+      generation_status: "generating"
+    )
+    client = FakeClient.new(->(_prompt) { JSON.generate(response: "not json") })
+    tts_client = FakeTTSClient.new
+
+    ChatResponder.new(chat:, client:, tts_client:).stream_response_into(
+      assistant_message: assistant,
+      user_message: "/say Jhabite avec mon ami"
+    )
+
+    assert_equal "J'habite avec mon ami", tts_client.requests.first.fetch(:input_text)
   end
 
   test "stream_response_into stores thinking-only chunks while waiting for answer content" do
