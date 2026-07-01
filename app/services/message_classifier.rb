@@ -1,7 +1,13 @@
 # frozen_string_literal: true
 
 class MessageClassifier
-  Result = Struct.new(:intent, :normalized_text, :matched_rule, :input_excerpt, :mostly_french, :question, :lookup_mode, :command, :compact, keyword_init: true) do
+  Result = Struct.new(
+    :intent, :normalized_text, :matched_rule, :input_excerpt, :mostly_french,
+    :question, :lookup_mode, :command, :compact_prompt,
+    keyword_init: true
+  ) do
+    alias_method :compact, :compact_prompt
+
     def to_h
       {
         intent: intent.to_s,
@@ -12,7 +18,7 @@ class MessageClassifier
         question:,
         lookup_mode:,
         command:,
-        compact:
+        compact: compact_prompt
       }
     end
   end
@@ -138,8 +144,8 @@ class MessageClassifier
                               match[1].strip
                             elsif normalized.start_with?("validate ")
                               text.sub(/\Avalidate\s+/i, "").strip
-                            elsif (match = text.match(/["“](.+?)["”]/))
-                              match[1].strip
+                            elsif quoted_sentence.present?
+                              quoted_sentence
                             else
                               ""
                             end
@@ -193,7 +199,7 @@ class MessageClassifier
       question: question?,
       lookup_mode:,
       command: nil,
-      compact: false
+      compact_prompt: false
     )
   end
 
@@ -207,7 +213,11 @@ class MessageClassifier
       question: command.input.end_with?("?"),
       lookup_mode: command.intent == :vocabulary ? lookup_mode_for(command.input) : nil,
       command: command.command,
-      compact: true
+      compact_prompt: true
     )
+  end
+
+  def quoted_sentence
+    @quoted_sentence ||= text.match(/["“](.+?)["”]/)&.[](1)&.strip.to_s
   end
 end

@@ -46,13 +46,32 @@ module Prompts
       <<~PROMPT
         You are a patient French tutor.
 
+        #{legacy_profile(target_language)}
+
+        #{legacy_output_contract(target_language)}
+
+        #{legacy_example}
+
+        Learner message:
+        #{user_message}
+      PROMPT
+    end
+    private_class_method :legacy_build
+
+    def self.legacy_profile(target_language)
+      <<~PROMPT.strip
         Learner profile:
         - Native/explanation language: #{DEFAULT_LANGUAGE}
         - Target language: #{target_language}
         - Current level: beginner
 
         For every learner message, generate one assistant reply.
+      PROMPT
+    end
+    private_class_method :legacy_profile
 
+    def self.legacy_output_contract(target_language)
+      <<~PROMPT.strip
         Return exactly one JSON object.
 
         Do not output anything before or after the JSON.
@@ -74,7 +93,12 @@ module Prompts
         - Do not output thinking, hidden reasoning, or `<think>` blocks.
         - The JSON must be valid and parseable.
         - When the learner asks a general question about something not related to #{target_language}, answer it as a tutor would, not as a refusal.
+      PROMPT
+    end
+    private_class_method :legacy_output_contract
 
+    def self.legacy_example
+      <<~PROMPT.strip
         Example:
 
         Learner: Hi
@@ -84,11 +108,8 @@ module Prompts
           "default_language": "Hi! How can I help you learn French today?",
           "target_language": "Bonjour ! Comment puis-je vous aider à apprendre le français aujourd'hui ?"
         }
-
-        Learner message:
-        #{user_message}
       PROMPT
     end
-    private_class_method :legacy_build
+    private_class_method :legacy_example
   end
 end
