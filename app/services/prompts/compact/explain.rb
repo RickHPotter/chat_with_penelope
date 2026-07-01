@@ -15,11 +15,21 @@ module Prompts
 
           In both languages include:
           # Rule
+          State the core rule in 1-2 sentences.
+
           # Explanation
+          Explain how it works for a beginner. Use 2-4 bullets when useful.
+
           # Examples
+          Give 3 short examples. In English output, examples may use `French → English`.
+          In French output, examples must stay French-only with short French explanations.
+
           # Common Mistake
+          Include only one common beginner mistake.
 
           Never invent grammar rules. Prefer standard French used in France.
+          If there are regional or register differences, mention them briefly.
+          Do not include a correction unless the learner provided a sentence to correct.
 
           #{compact_json_reminder}
         PROMPT

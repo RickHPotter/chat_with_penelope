@@ -23,6 +23,8 @@ module Prompts
           - Keep the answer concise and beginner-friendly.
           - Do not reason step by step.
           - Do not output thinking, hidden reasoning, or `<think>` blocks.
+          - Use light Markdown inside string values: `# Heading`, `- bullets`, **bold**, and `inline code`.
+          - Do not use tables, HTML, nested lists, or long essays.
 
           Bad output:
           {"default_language":"English","target_language":"French"}

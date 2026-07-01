@@ -89,6 +89,9 @@ class PromptsTutorTest < ActiveSupport::TestCase
     assert_includes prompt, '{"default_language":"English","target_language":"French"}'
     assert_includes prompt, "Your answer must discuss this exact sentence, not the JSON schema."
     assert_includes prompt, "Mention whether `J'habite en rue Dumas` is correct or incorrect."
+    assert_includes prompt, "Confidence: High"
+    assert_includes prompt, "Explain French roles, not just translations."
+    assert_includes prompt, "Include `# More Natural` only if there is a genuinely more natural spoken alternative."
     assert_includes prompt, "The values must be the actual tutor answer text, not language names."
     assert_no_match(/The learner has submitted a French sentence/, prompt)
   end
@@ -134,6 +137,43 @@ class PromptsTutorTest < ActiveSupport::TestCase
 
     assert_includes prompt, "Task: explain this French grammar topic."
     assert_includes prompt, "Topic/question:\nle passé composé"
+    assert_includes prompt, "Give 3 short examples."
+    assert_includes prompt, "Do not include a correction unless the learner provided a sentence to correct."
+  end
+
+  test "compact prompts request supported markdown only" do
+    prompt = Prompts::Tutor.build(chat: @chat, user_message: "/explain le passé composé", messages: [])
+
+    assert_includes prompt, "Use light Markdown inside string values"
+    assert_includes prompt, "`# Heading`, `- bullets`, **bold**, and `inline code`"
+    assert_includes prompt, "Do not use tables, HTML, nested lists, or long essays."
+  end
+
+  test "uses compact translate prompt with explicit direction handling" do
+    prompt = Prompts::Tutor.build(chat: @chat, user_message: "/translate Je suis fatigué", messages: [])
+
+    assert_includes prompt, "First decide the source language from the text itself."
+    assert_includes prompt, "If the text is French:"
+    assert_includes prompt, "`default_language` must include `# Translation`"
+    assert_includes prompt, "`target_language` must not translate the sentence again."
+    assert_includes prompt, "`target_language` must include `# Structure` and `# Explanation`."
+    assert_includes prompt, "Separate connectors from clauses when useful."
+    assert_includes prompt, "Good: `mais`"
+    assert_includes prompt, "Good: `elle ne démarre pas`"
+    assert_includes prompt, "Explain important words and the whole sentence meaning in French."
+    assert_includes prompt, "What the whole sentence communicates."
+    assert_includes prompt, "the speaker borrowed a friend's car and has a problem because it will not start"
+    assert_includes prompt, "Avoid circular explanations like `rue`"
+    assert_includes prompt, "Prefer useful French explanations like `rue`"
+  end
+
+  test "uses compact say prompt with constrained alternatives" do
+    prompt = Prompts::Tutor.build(chat: @chat, user_message: "/say I am tired", messages: [])
+
+    assert_includes prompt, "`default_language` must be an empty string."
+    assert_includes prompt, "Give one natural French sentence first."
+    assert_includes prompt, "Do not provide more than one alternative."
+    assert_includes prompt, "Do not translate the French sentence back into English."
   end
 
   test "does not include existing conversation history" do

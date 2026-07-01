@@ -18,17 +18,22 @@ module Prompts
 
           In both languages include:
           # Correction
-          Say if it is correct. If incorrect, give exactly one corrected sentence.
+          Start with **Correct** or **Incorrect**.
+          If incorrect, give exactly one corrected sentence.
+          Add confidence as `Confidence: High`, `Medium`, or `Low`.
 
           # Why
-          Explain the correction briefly. Do not call `rue` or street-name elements prepositions.
+          Explain the correction briefly with 1-3 bullets.
+          Do not call `rue` or street-name elements prepositions.
           Do not alter proper nouns, for example Dumas must stay Dumas.
 
           # Breakdown
-          Briefly explain the important French words.
+          Explain French roles, not just translations.
+          Good: `Je` — subject pronoun.
+          Good: `habite` — present tense of `habiter`.
+          Bad: `Je` — I.
 
-          If a more natural sentence is different from the strict correction, include:
-          More natural: ...
+          Include `# More Natural` only if there is a genuinely more natural spoken alternative.
 
           Do not include synonyms unless asked.
 

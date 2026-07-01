@@ -17,9 +17,14 @@ module Prompts
 
           `target_language` must include:
           # Translation
+          Give one natural French sentence first.
+
           # Note
-          # Alternative
-          Only include an alternative if it is useful.
+          Briefly explain one important choice, such as register, tense, or word order.
+
+          Include `# Alternative` only if another phrasing is genuinely common or changes register.
+          Do not provide more than one alternative.
+          Do not translate the French sentence back into English.
 
           #{compact_json_reminder}
         PROMPT
