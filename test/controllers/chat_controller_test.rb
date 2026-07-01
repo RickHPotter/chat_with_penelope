@@ -10,8 +10,8 @@ class ChatControllerTest < ActionDispatch::IntegrationTest
 
   test "create message updates composer frame contents instead of replacing the frame" do
     post chat_messages_url,
-      params: { message: { content: "/define gauche" } },
-      as: :turbo_stream
+         params: { message: { content: "/define gauche" } },
+         as: :turbo_stream
 
     assert_response :success
     assert_includes response.body, '<turbo-stream action="update" target="composer">'

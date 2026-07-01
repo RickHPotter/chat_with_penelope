@@ -21,8 +21,8 @@ class ChatResponderTest < ActiveSupport::TestCase
       @chunks = chunks
     end
 
-    def generate_stream(prompt:)
-      @chunks.each { |chunk| yield chunk }
+    def generate_stream(prompt:, &) # rubocop:disable Lint/UnusedMethodArgument
+      @chunks.each(&)
     end
   end
 
@@ -111,11 +111,11 @@ class ChatResponderTest < ActiveSupport::TestCase
       generation_status: "generating"
     )
     client = FakeStreamingClient.new([
-      '{"default_language":"Correct sentence: J',
-      "'habite rue Dumas.",
-      '","target_language":"Phrase correcte : J',
-      "'habite rue Dumas.\"}"
-    ])
+                                       '{"default_language":"Correct sentence: J',
+                                       "'habite rue Dumas.",
+                                       '","target_language":"Phrase correcte : J',
+                                       "'habite rue Dumas.\"}"
+                                     ])
 
     ChatResponder.new(chat:, client:).stream_response_into(
       assistant_message: assistant,
@@ -143,7 +143,7 @@ class ChatResponderTest < ActiveSupport::TestCase
         target_language: "J'habite rue Dumas."
       )
     )
-    client = FakeClient.new(->(prompt) do
+    client = FakeClient.new(lambda do |prompt|
       assert_includes prompt, "You clean French text before text-to-speech."
       response
     end)
@@ -194,9 +194,9 @@ class ChatResponderTest < ActiveSupport::TestCase
       generation_status: "generating"
     )
     client = FakeStreamingClient.new([
-      { type: :thinking, text: "Role" },
-      { type: :thinking, text: ":" }
-    ])
+                                       { type: :thinking, text: "Role" },
+                                       { type: :thinking, text: ":" }
+                                     ])
 
     ChatResponder.new(chat:, client:).stream_response_into(
       assistant_message: assistant,
@@ -224,7 +224,7 @@ class ChatResponderTest < ActiveSupport::TestCase
         target_language: "Incorrect."
       )
     )
-    client = FakeClient.new(->(prompt) do
+    client = FakeClient.new(lambda do |prompt|
       captured_prompt = prompt
       response
     end)

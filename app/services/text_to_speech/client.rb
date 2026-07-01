@@ -37,13 +37,9 @@ module TextToSpeech
         output_path:
       )
 
-      unless response.is_a?(Net::HTTPSuccess)
-        raise Error, "TTS API failed with #{response.code}: #{response.body}"
-      end
+      raise Error, "TTS API failed with #{response.code}: #{response.body}" unless response.is_a?(Net::HTTPSuccess)
 
-      unless File.exist?(output_path)
-        raise Error, "TTS API did not create #{output_path}"
-      end
+      raise Error, "TTS API did not create #{output_path}" unless File.exist?(output_path)
 
       Result.new(
         input_text:,

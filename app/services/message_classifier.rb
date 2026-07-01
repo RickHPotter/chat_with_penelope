@@ -100,15 +100,15 @@ class MessageClassifier
   def vocabulary_expression
     @vocabulary_expression ||= begin
       expression = normalized
-        .sub(/\Adefine\s+/, "")
-        .sub(/\Awhat does\s+/, "")
-        .sub(/\Awhat is\s+/, "")
-        .sub(/\s+mean\??\z/, "")
-        .sub(/\s+en français\??\z/, "")
-        .sub(/\Aen français\s+/, "")
-        .sub(/\Aque veut dire\s+/, "")
-        .sub(/\Aqu'?est-ce que\s+/, "")
-        .sub(/\s+signifie\??\z/, "")
+                   .sub(/\Adefine\s+/, "")
+                   .sub(/\Awhat does\s+/, "")
+                   .sub(/\Awhat is\s+/, "")
+                   .sub(/\s+mean\??\z/, "")
+                   .sub(/\s+en français\??\z/, "")
+                   .sub(/\Aen français\s+/, "")
+                   .sub(/\Aque veut dire\s+/, "")
+                   .sub(/\Aqu'?est-ce que\s+/, "")
+                   .sub(/\s+signifie\??\z/, "")
 
       expression.presence || text
     end
@@ -134,17 +134,15 @@ class MessageClassifier
   end
 
   def extracted_sentence
-    @extracted_sentence ||= begin
-      if (match = text.match(/(?:->|:)\s*(.+)\z/))
-        match[1].strip
-      elsif normalized.start_with?("validate ")
-        text.sub(/\Avalidate\s+/i, "").strip
-      elsif (match = text.match(/["“](.+?)["”]/))
-        match[1].strip
-      else
-        ""
-      end
-    end
+    @extracted_sentence ||= if (match = text.match(/(?:->|:)\s*(.+)\z/))
+                              match[1].strip
+                            elsif normalized.start_with?("validate ")
+                              text.sub(/\Avalidate\s+/i, "").strip
+                            elsif (match = text.match(/["“](.+?)["”]/))
+                              match[1].strip
+                            else
+                              ""
+                            end
   end
 
   def sentence_validation_request?

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module ApplicationHelper
-  def markdown_like(content)
+  def markdown_like(content) # rubocop:disable Metrics/AbcSize
     lines = content.to_s.lines.map(&:chomp)
     blocks = []
     list_items = []

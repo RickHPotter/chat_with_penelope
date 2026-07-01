@@ -56,14 +56,12 @@ class ChatController < ApplicationController
   end
 
   def create_message_stream(result)
-    streams = [
+    [
       turbo_stream.append("messages", partial: "chat/message", locals: { message: result.user_message }),
       turbo_stream.append("messages", partial: "chat/message", locals: { message: result.response_message }),
       turbo_stream.update("composer", partial: "chat/composer", locals: { chat: @chat, message: Message.new }),
       turbo_stream.update("chat_errors", partial: "chat/errors", locals: { error_message: nil })
     ]
-
-    streams
   end
 
   def reprompt_stream(result)

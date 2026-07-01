@@ -23,7 +23,7 @@ module LLM
       end
 
       test "builds responses api request" do
-        previous_max_tokens = ENV["CHAT_MAX_TOKENS"]
+        previous_max_tokens = ENV.fetch("CHAT_MAX_TOKENS", nil)
         ENV["CHAT_MAX_TOKENS"] = "70"
         provider = LMStudio.new(
           api_url: "http://127.0.0.1:1234/v1/chat/completions",
@@ -83,7 +83,8 @@ module LLM
         )
         chunks = []
 
-        provider.send(:parse_stream_chunk, "data: {\"choices\":[{\"delta\":{\"content\":\"Bon\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"jour\"}}]}\n\n") do |content|
+        provider.send(:parse_stream_chunk,
+                      "data: {\"choices\":[{\"delta\":{\"content\":\"Bon\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"jour\"}}]}\n\n") do |content|
           chunks << content
         end
 
@@ -100,7 +101,10 @@ module LLM
         )
         chunks = []
 
-        provider.send(:parse_stream_chunk, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Bon\"}\n\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"jour\"}\n\n") do |content|
+        provider.send(
+          :parse_stream_chunk,
+          "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Bon\"}\n\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"jour\"}\n\n"
+        ) do |content|
           chunks << content
         end
 
@@ -116,8 +120,16 @@ module LLM
           model: "frenchgemma-3-4b-instruct"
         )
         chunks = []
+        stream = <<~STREAM
+          data: {"type":"response.created","response":{"id":"resp_123","status":"in_progress"}}
 
-        provider.send(:parse_stream_chunk, "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_123\",\"status\":\"in_progress\"}}\n\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"Bon\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_123\",\"status\":\"completed\"}}\n\n") do |content|
+          data: {"type":"response.output_text.delta","delta":"Bon"}
+
+          data: {"type":"response.completed","response":{"id":"resp_123","status":"completed"}}
+
+        STREAM
+
+        provider.send(:parse_stream_chunk, stream) do |content|
           chunks << content
         end
 
@@ -131,7 +143,10 @@ module LLM
         )
         chunks = []
 
-        provider.send(:parse_stream_chunk, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Bon\"}\n\ndata: {\"type\":\"response.output_text.done\",\"output_text\":\"Bonjour\"}\n\n") do |content|
+        provider.send(
+          :parse_stream_chunk,
+          "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Bon\"}\n\ndata: {\"type\":\"response.output_text.done\",\"output_text\":\"Bonjour\"}\n\n"
+        ) do |content|
           chunks << content
         end
 

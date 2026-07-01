@@ -183,7 +183,7 @@ class PromptsTutorTest < ActiveSupport::TestCase
       content_target_language: "Bonjour"
     )
 
-    prompt = Prompts::Tutor.build(chat: @chat, user_message: "Je suis fatigué.", messages: [message])
+    prompt = Prompts::Tutor.build(chat: @chat, user_message: "Je suis fatigué.", messages: [ message ])
 
     assert_no_match(/Conversation history:/, prompt)
     assert_no_match(/Learner: Bonjour/, prompt)

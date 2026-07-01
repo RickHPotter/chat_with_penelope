@@ -286,8 +286,7 @@ class ChatResponder
     cleaned = text.to_s.strip.tr("`´’‘", "'")
     cleaned = cleaned.gsub(/\s+/, " ")
     cleaned = cleaned.gsub(/\b([Jj])(?=ai|aime|adore|arrive|attends|ouvre|habite|emprunte|étais|etais|écoute|ecoute)/, "\\1'")
-    cleaned = cleaned.gsub(/\b([CcDdLlMmNnQqSsTt])\s+'/, "\\1'")
-    cleaned
+    cleaned.gsub(/\b([CcDdLlMmNnQqSsTt])\s+'/, "\\1'")
   end
 
   def audio_message_content(cleaned_text)
@@ -474,14 +473,14 @@ class ChatResponder
   def split_thinking(text)
     thinking_parts = text.scan(%r{<think>(.*?)</think>}m).flatten
     open_thinking = text[/<think>(.*)\z/m, 1] unless text.include?("</think>")
-    thinking = ([ *thinking_parts, open_thinking ].compact.join("\n\n")).strip
+    thinking = [ *thinking_parts, open_thinking ].compact.join("\n\n").strip
     visible = strip_thinking(text).strip
 
     [ thinking, visible ]
   end
 
   def strip_thinking(text)
-    text.gsub(%r{<think>.*?</think>}m, "").sub(%r{<think>.*\z}m, "")
+    text.gsub(%r{<think>.*?</think>}m, "").sub(/<think>.*\z/m, "")
   end
 
   def streaming_preview_for(text)
